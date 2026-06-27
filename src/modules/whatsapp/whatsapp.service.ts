@@ -77,9 +77,11 @@ export class WhatsappService {
   }
 
   async findById(id: string, companyId: string): Promise<WhatsappNumber> {
-    const number = await this.whatsappNumberRepository.findOne({
-      where: { id, companyId },
-    });
+    const number = await this.whatsappNumberRepository
+      .createQueryBuilder('n')
+      .addSelect('n.accessToken')
+      .where('n.id = :id AND n.companyId = :companyId', { id, companyId })
+      .getOne();
     if (!number) {
       throw new NotFoundException('Número WhatsApp não encontrado');
     }
@@ -87,9 +89,11 @@ export class WhatsappService {
   }
 
   async findByPhoneNumberId(phoneNumberId: string): Promise<WhatsappNumber | null> {
-    return this.whatsappNumberRepository.findOne({
-      where: { phoneNumberId, isActive: true },
-    });
+    return this.whatsappNumberRepository
+      .createQueryBuilder('n')
+      .addSelect('n.accessToken')
+      .where('n.phoneNumberId = :phoneNumberId AND n.isActive = true', { phoneNumberId })
+      .getOne();
   }
 
   async remove(id: string, companyId: string): Promise<void> {

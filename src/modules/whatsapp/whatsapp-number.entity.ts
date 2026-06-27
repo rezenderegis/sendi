@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { Company } from '../companies/company.entity';
 
 @Entity('whatsapp_numbers')
@@ -27,7 +28,8 @@ export class WhatsappNumber {
   @Column()
   wabaId: string;
 
-  @Column()
+  @Exclude()
+  @Column({ select: false })
   accessToken: string;
 
   @Column()
