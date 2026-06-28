@@ -3,6 +3,8 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -13,6 +15,7 @@ import { Contact } from '../contacts/contact.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { User } from '../users/user.entity';
 import { Message } from './message.entity';
+import { Tag } from '../tags/tag.entity';
 
 export enum ConversationStatus {
   OPEN = 'open',
@@ -61,6 +64,14 @@ export class Conversation {
 
   @OneToMany(() => Message, (message) => message.conversation)
   messages: Message[];
+
+  @ManyToMany(() => Tag)
+  @JoinTable({
+    name: 'conversation_tags',
+    joinColumn: { name: 'conversationId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
 
   @CreateDateColumn()
   createdAt: Date;

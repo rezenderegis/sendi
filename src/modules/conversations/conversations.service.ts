@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Conversation, ConversationStatus } from './conversation.entity';
 import { Message, MessageDirection, MessageStatus, MessageType } from './message.entity';
+import { Tag } from '../tags/tag.entity';
 
 @Injectable()
 export class ConversationsService {
@@ -11,28 +12,39 @@ export class ConversationsService {
     private readonly conversationRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    @InjectRepository(Tag)
+    private readonly tagRepository: Repository<Tag>,
   ) {}
 
   async findAll(
     companyId: string,
     page = 1,
     limit = 20,
+    tagId?: string,
   ): Promise<{ data: Conversation[]; total: number; page: number; limit: number }> {
-    const [data, total] = await this.conversationRepository.findAndCount({
-      where: { companyId },
-      relations: ['contact', 'whatsappNumber', 'assignedUser'],
-      order: { lastMessageAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const qb = this.conversationRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.contact', 'contact')
+      .leftJoinAndSelect('c.whatsappNumber', 'whatsappNumber')
+      .leftJoinAndSelect('c.assignedUser', 'assignedUser')
+      .leftJoinAndSelect('c.tags', 'tags')
+      .where('c.companyId = :companyId', { companyId })
+      .orderBy('c.lastMessageAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
+    if (tagId) {
+      qb.innerJoin('c.tags', 'filterTag', 'filterTag.id = :tagId', { tagId });
+    }
+
+    const [data, total] = await qb.getManyAndCount();
     return { data, total, page, limit };
   }
 
   async findById(id: string, companyId: string): Promise<Conversation> {
     const conversation = await this.conversationRepository.findOne({
       where: { id, companyId },
-      relations: ['contact', 'whatsappNumber', 'assignedUser'],
+      relations: ['contact', 'whatsappNumber', 'assignedUser', 'tags'],
     });
     if (!conversation) {
       throw new NotFoundException('Conversa não encontrada');
@@ -70,6 +82,31 @@ export class ConversationsService {
       conversation.assignedUserId = assignedUserId;
     }
     return this.conversationRepository.save(conversation);
+  }
+
+  async addTag(conversationId: string, companyId: string, tagId: string): Promise<void> {
+    await this.findById(conversationId, companyId);
+
+    const tag = await this.tagRepository.findOne({ where: { id: tagId, companyId } });
+    if (!tag) {
+      throw new NotFoundException('Tag não encontrada');
+    }
+
+    await this.conversationRepository
+      .createQueryBuilder()
+      .relation(Conversation, 'tags')
+      .of(conversationId)
+      .add(tagId);
+  }
+
+  async removeTag(conversationId: string, companyId: string, tagId: string): Promise<void> {
+    await this.findById(conversationId, companyId);
+
+    await this.conversationRepository
+      .createQueryBuilder()
+      .relation(Conversation, 'tags')
+      .of(conversationId)
+      .remove(tagId);
   }
 
   async findOrCreate(

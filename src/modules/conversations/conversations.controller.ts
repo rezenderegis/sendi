@@ -1,17 +1,20 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
-  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ConversationsService } from './conversations.service';
 import { ConversationStatus } from './conversation.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -29,6 +32,12 @@ class UpdateConversationDto {
   assignedUserId?: string;
 }
 
+class AddTagDto {
+  @ApiProperty()
+  @IsUUID()
+  tagId: string;
+}
+
 @ApiTags('Conversations')
 @Controller('conversations')
 @UseGuards(JwtAuthGuard, CompanyAccessGuard)
@@ -40,15 +49,18 @@ export class ConversationsController {
   @ApiOperation({ summary: 'Listar conversas da empresa (paginado)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'tagId', required: false, type: String, description: 'Filtrar por tag' })
   findAll(
     @CurrentUser('companyId') companyId: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @Query('tagId') tagId?: string,
   ) {
     return this.conversationsService.findAll(
       companyId,
       parseInt(page, 10),
       parseInt(limit, 10),
+      tagId,
     );
   }
 
@@ -92,5 +104,27 @@ export class ConversationsController {
       dto.status,
       dto.assignedUserId,
     );
+  }
+
+  @Post(':id/tags')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Adicionar tag à conversa' })
+  addTag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: AddTagDto,
+  ) {
+    return this.conversationsService.addTag(id, companyId, dto.tagId);
+  }
+
+  @Delete(':id/tags/:tagId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remover tag da conversa' })
+  removeTag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.conversationsService.removeTag(id, companyId, tagId);
   }
 }
