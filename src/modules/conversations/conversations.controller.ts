@@ -106,6 +106,16 @@ export class ConversationsController {
     );
   }
 
+  @Post(':id/bot/enable')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Reativar bot na conversa' })
+  enableBot(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.conversationsService.enableBot(id, companyId);
+  }
+
   @Post(':id/tags')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Adicionar tag à conversa' })

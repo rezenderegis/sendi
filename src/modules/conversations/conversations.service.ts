@@ -165,6 +165,11 @@ export class ConversationsService {
     await this.conversationRepository.update(conversationId, { aiState: state });
   }
 
+  async enableBot(id: string, companyId: string): Promise<void> {
+    await this.findById(id, companyId);
+    await this.conversationRepository.update(id, { aiState: null });
+  }
+
   async updateMessageStatus(
     whatsappMessageId: string,
     status: MessageStatus,
