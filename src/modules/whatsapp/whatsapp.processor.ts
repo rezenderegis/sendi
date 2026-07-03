@@ -7,25 +7,36 @@ import { AiService } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 
-const HUMAN_REQUEST_KEYWORDS = [
-  'atendente',
-  'atendimento humano',
-  'falar com pessoa',
-  'falar com humano',
-  'falar com alguém',
-  'falar com alguem',
-  'quero uma pessoa',
-  'quero um humano',
-  'preciso de ajuda humana',
-  'suporte humano',
-  'humano',
+const HUMAN_WORDS = [
+  'humano', 'humana',
+  'pessoa', 'pessoas',
+  'atendente', 'atendentes',
+  'consultor', 'consultora', 'consultores', 'consultoras',
+  'responsavel', 'responsaveis',
+  'gerente', 'gerentes',
+  'supervisor', 'supervisora',
+  'especialista', 'especialistas',
+  'agente', 'agentes',
+  'representante', 'representantes',
+  'vendedor', 'vendedora',
+  'funcionario', 'funcionaria',
+  'colaborador', 'colaboradora',
+  'real', 'alguem', 'alguien',
+  'time', 'equipe',
+];
+
+const ACTION_WORDS = [
+  'falar', 'conversar', 'chamar', 'transferir', 'transfere',
+  'passa', 'passem', 'conectar', 'conecta',
+  'quero', 'preciso', 'gostaria', 'pode', 'tem como',
+  'me coloca', 'me manda', 'me passa', 'me transfere',
 ];
 
 function isRequestingHuman(text: string): boolean {
   const normalized = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  return HUMAN_REQUEST_KEYWORDS.some((kw) =>
-    normalized.includes(kw.normalize('NFD').replace(/[̀-ͯ]/g, '')),
-  );
+  const hasHuman = HUMAN_WORDS.some((w) => normalized.includes(w));
+  const hasAction = ACTION_WORDS.some((w) => normalized.includes(w));
+  return hasHuman && hasAction;
 }
 
 @Processor('whatsapp')
@@ -128,7 +139,7 @@ export class WhatsappProcessor {
           companyId,
         );
       } else {
-        const reply = await this.aiService.chat(contact.name, content);
+        const reply = await this.aiService.chat(contact.name, content, whatsappNumber.systemPrompt);
         await this.whatsappService.sendBotReply(
           whatsappNumber,
           fromPhone,

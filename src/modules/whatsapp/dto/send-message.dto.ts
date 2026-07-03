@@ -34,6 +34,13 @@ export class SendMessageDto {
   templateLanguage?: string;
 }
 
+export class UpdateWhatsappNumberDto {
+  @ApiPropertyOptional({ example: 'Você é um assistente da Empresa X...' })
+  @IsString()
+  @IsOptional()
+  systemPrompt?: string;
+}
+
 export class ConnectNumberDto {
   @ApiProperty({ example: '1145309178672013' })
   @IsString()

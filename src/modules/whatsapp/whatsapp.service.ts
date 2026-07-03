@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { WhatsappNumber } from './whatsapp-number.entity';
-import { ConnectNumberDto, SendMessageDto } from './dto/send-message.dto';
+import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
@@ -94,6 +94,12 @@ export class WhatsappService {
       .addSelect('n.accessToken')
       .where('n.phoneNumberId = :phoneNumberId AND n.isActive = true', { phoneNumberId })
       .getOne();
+  }
+
+  async updateNumber(id: string, companyId: string, dto: UpdateWhatsappNumberDto): Promise<WhatsappNumber> {
+    const number = await this.findById(id, companyId);
+    Object.assign(number, dto);
+    return this.whatsappNumberRepository.save(number);
   }
 
   async remove(id: string, companyId: string): Promise<void> {

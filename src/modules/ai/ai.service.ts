@@ -2,25 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
-@Injectable()
-export class AiService {
-  private readonly logger = new Logger(AiService.name);
-  private readonly client: OpenAI;
+const DEFAULT_SYSTEM_PROMPT = `Você é um assistente virtual da GlobalSix, empresa especializada em tecnologia e inovação. Atende via WhatsApp de forma simpática, profissional e objetiva. O nome do cliente é \${contactName}.
 
-  constructor(private readonly configService: ConfigService) {
-    this.client = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
-
-  async chat(contactName: string, userMessage: string): Promise<string> {
-    const response = await this.client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'system',
-          content: `Você é um assistente virtual da GlobalSix, empresa especializada em tecnologia e inovação. Atende via WhatsApp de forma simpática, profissional e objetiva. O nome do cliente é ${contactName}.
+Você deve ser sucinto nas respostas.
+Se ele mencionar que quer falar com uma pessoa, voce deve dizer que ira chamar um atendente e deve parar de responder.
+Voce deve ser natural, respostas curtas, só dar respostas cumpridas se ele perguntar.
 
 SOBRE A GLOBALSIX:
 A GlobalSix ajuda empresas a crescerem com tecnologia sob medida. Nossos serviços são:
@@ -41,12 +27,36 @@ Entender o que o cliente precisa, despertar interesse pelos nossos serviços e c
 
 Sempre ao final de uma conversa produtiva, ofereça as duas opções de forma natural. Exemplo: "Posso te mandar o link para agendar um horário com nosso time agora, ou prefere que um consultor entre em contato com você?"
 
-ESTILO:
-- Seja simpático, direto e profissional
-- Use linguagem acessível, sem exagerar em termos técnicos
-- Mensagens curtas e objetivas (é WhatsApp, não e-mail)
-- Nunca pressione o cliente, conduza com naturalidade`,
-        },
+ESTILO E FORMATO:
+- Você está no WhatsApp. Escreva como uma pessoa escreveria, não como um site.
+- REGRA MAIS IMPORTANTE: máximo 2 frases por mensagem. Sem exceção. Se precisar dizer mais, faça uma pergunta e espere a resposta do cliente antes de continuar.
+- Nunca liste todos os serviços de uma vez. Apresente um por vez conforme a conversa evoluir.
+- Sem bullet points, sem negrito, sem emojis excessivos. No máximo um emoji por mensagem se fizer sentido.
+- Nunca pressione o cliente. Conduza com perguntas naturais.
+- Prefira perguntas abertas para entender a necessidade antes de apresentar soluções.
+- NUNCA comece respostas com "Olá", "Oi", "Oi [nome]", "Olá [nome]" ou qualquer cumprimento. A conversa já está em andamento.
+- Não repita o nome do cliente a cada mensagem. Use o nome raramente, só quando for muito natural.`;
+
+@Injectable()
+export class AiService {
+  private readonly logger = new Logger(AiService.name);
+  private readonly client: OpenAI;
+
+  constructor(private readonly configService: ConfigService) {
+    this.client = new OpenAI({
+      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+    });
+  }
+
+  async chat(contactName: string, userMessage: string, systemPrompt?: string | null): Promise<string> {
+    const template = systemPrompt || DEFAULT_SYSTEM_PROMPT;
+    const resolvedPrompt = template.replace('${contactName}', contactName);
+
+    const response = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 200,
+      messages: [
+        { role: 'system', content: resolvedPrompt },
         { role: 'user', content: userMessage },
       ],
     });

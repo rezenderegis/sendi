@@ -5,12 +5,13 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
-import { ConnectNumberDto, SendMessageDto } from './dto/send-message.dto';
+import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -35,6 +36,16 @@ export class WhatsappController {
   @ApiOperation({ summary: 'Listar números da empresa' })
   findAll(@CurrentUser('companyId') companyId: string) {
     return this.whatsappService.findAll(companyId);
+  }
+
+  @Patch('numbers/:id')
+  @ApiOperation({ summary: 'Atualizar configurações do número (ex: prompt do bot)' })
+  updateNumber(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: UpdateWhatsappNumberDto,
+  ) {
+    return this.whatsappService.updateNumber(id, companyId, dto);
   }
 
   @Delete('numbers/:id')

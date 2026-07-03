@@ -44,6 +44,9 @@ export class WhatsappNumber {
   @Column()
   webhookVerifyToken: string;
 
+  @Column({ type: 'text', nullable: true })
+  systemPrompt: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
