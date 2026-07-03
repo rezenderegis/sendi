@@ -3,7 +3,30 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ContactsService } from '../contacts/contacts.service';
+import { AiService } from '../ai/ai.service';
+import { WhatsappService } from './whatsapp.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
+
+const HUMAN_REQUEST_KEYWORDS = [
+  'atendente',
+  'atendimento humano',
+  'falar com pessoa',
+  'falar com humano',
+  'falar com alguém',
+  'falar com alguem',
+  'quero uma pessoa',
+  'quero um humano',
+  'preciso de ajuda humana',
+  'suporte humano',
+  'humano',
+];
+
+function isRequestingHuman(text: string): boolean {
+  const normalized = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return HUMAN_REQUEST_KEYWORDS.some((kw) =>
+    normalized.includes(kw.normalize('NFD').replace(/[̀-ͯ]/g, '')),
+  );
+}
 
 @Processor('whatsapp')
 export class WhatsappProcessor {
@@ -12,18 +35,20 @@ export class WhatsappProcessor {
   constructor(
     private readonly conversationsService: ConversationsService,
     private readonly contactsService: ContactsService,
+    private readonly aiService: AiService,
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   @Process('inbound-message')
   async handleInboundMessage(job: Job) {
-    const { message, whatsappNumber, companyId } = job.data;
+    const { message, whatsappNumber, companyId, whatsappName } = job.data;
 
     try {
       const fromPhone = message.from;
       const contact = await this.contactsService.findOrCreateByPhone(
         fromPhone,
         companyId,
-        fromPhone,
+        whatsappName,
       );
 
       const conversation = await this.conversationsService.findOrCreate(
@@ -65,9 +90,53 @@ export class WhatsappProcessor {
         metadata: { raw: message },
       });
 
-      this.logger.log(
-        `Mensagem inbound processada: ${message.id} de ${fromPhone}`,
-      );
+      this.logger.log(`Mensagem inbound processada: ${message.id} de ${fromPhone}`);
+
+      if (message.type !== 'text') return;
+
+      if (conversation.aiState === 'human_requested') return;
+
+      const contactHasName = contact.name !== contact.phone;
+
+      if (conversation.aiState === 'waiting_name') {
+        const name = content.trim();
+        await this.contactsService.update(contact.id, companyId, { name });
+        await this.conversationsService.updateAiState(conversation.id, null);
+        await this.whatsappService.sendBotReply(
+          whatsappNumber,
+          fromPhone,
+          `Prazer, ${name}! Como posso te ajudar?`,
+          conversation.id,
+          companyId,
+        );
+      } else if (!contactHasName) {
+        await this.conversationsService.updateAiState(conversation.id, 'waiting_name');
+        await this.whatsappService.sendBotReply(
+          whatsappNumber,
+          fromPhone,
+          'Olá! Para te atender melhor, qual é o seu nome?',
+          conversation.id,
+          companyId,
+        );
+      } else if (isRequestingHuman(content)) {
+        await this.conversationsService.updateAiState(conversation.id, 'human_requested');
+        await this.whatsappService.sendBotReply(
+          whatsappNumber,
+          fromPhone,
+          'Entendido! Um atendente entrará em contato em breve. 👋',
+          conversation.id,
+          companyId,
+        );
+      } else {
+        const reply = await this.aiService.chat(contact.name, content);
+        await this.whatsappService.sendBotReply(
+          whatsappNumber,
+          fromPhone,
+          reply,
+          conversation.id,
+          companyId,
+        );
+      }
     } catch (error) {
       this.logger.error(`Erro ao processar mensagem inbound: ${error.message}`, error.stack);
       throw error;

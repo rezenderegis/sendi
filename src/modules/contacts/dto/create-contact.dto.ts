@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -17,6 +17,26 @@ export class CreateContactDto {
   @IsOptional()
   email?: string;
 
+  @ApiPropertyOptional({ example: 'Acme Ltda' })
+  @IsString()
+  @IsOptional()
+  companyName?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  @IsUrl()
+  @IsOptional()
+  avatarUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Cliente VIP, prefere contato pela manhã' })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @ApiPropertyOptional({ example: 'crm-12345' })
+  @IsString()
+  @IsOptional()
+  externalId?: string;
+
   @ApiPropertyOptional()
   @IsObject()
   @IsOptional()
@@ -24,15 +44,35 @@ export class CreateContactDto {
 }
 
 export class UpdateContactDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'José Santos' })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'jose@email.com' })
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @ApiPropertyOptional({ example: 'Acme Ltda' })
+  @IsString()
+  @IsOptional()
+  companyName?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  @IsUrl()
+  @IsOptional()
+  avatarUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Cliente VIP, prefere contato pela manhã' })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @ApiPropertyOptional({ example: 'crm-12345' })
+  @IsString()
+  @IsOptional()
+  externalId?: string;
 
   @ApiPropertyOptional()
   @IsObject()

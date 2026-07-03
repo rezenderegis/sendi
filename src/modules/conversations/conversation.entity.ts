@@ -73,6 +73,9 @@ export class Conversation {
   })
   tags: Tag[];
 
+  @Column({ nullable: true })
+  aiState: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

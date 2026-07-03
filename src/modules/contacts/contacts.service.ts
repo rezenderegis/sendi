@@ -31,7 +31,7 @@ export class ContactsService {
   async findOrCreateByPhone(
     phone: string,
     companyId: string,
-    name?: string,
+    whatsappName?: string,
   ): Promise<Contact> {
     let contact = await this.contactRepository.findOne({
       where: { phone, companyId },
@@ -40,10 +40,17 @@ export class ContactsService {
     if (!contact) {
       contact = this.contactRepository.create({
         phone,
-        name: name || phone,
+        name: whatsappName || phone,
+        whatsappName: whatsappName || null,
         companyId,
       });
-      contact = await this.contactRepository.save(contact);
+      return this.contactRepository.save(contact);
+    }
+
+    // Atualiza o whatsappName se mudou, sem sobrescrever o name personalizado
+    if (whatsappName && contact.whatsappName !== whatsappName) {
+      contact.whatsappName = whatsappName;
+      return this.contactRepository.save(contact);
     }
 
     return contact;

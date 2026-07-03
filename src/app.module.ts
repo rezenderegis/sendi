@@ -35,6 +35,7 @@ import { TagsModule } from './modules/tags/tags.module';
         WHATSAPP_VERIFY_TOKEN: Joi.string().required(),
         WHATSAPP_API_URL: Joi.string().default('https://graph.facebook.com/v18.0'),
         ENCRYPTION_KEY: Joi.string().min(32).required(),
+        OPENAI_API_KEY: Joi.string().required(),
       }),
     }),
 

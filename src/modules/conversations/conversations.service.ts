@@ -161,6 +161,10 @@ export class ConversationsService {
     return saved;
   }
 
+  async updateAiState(conversationId: string, state: string | null): Promise<void> {
+    await this.conversationRepository.update(conversationId, { aiState: state });
+  }
+
   async updateMessageStatus(
     whatsappMessageId: string,
     status: MessageStatus,

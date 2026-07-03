@@ -9,6 +9,7 @@ import { WhatsappProcessor } from './whatsapp.processor';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { ContactsModule } from '../contacts/contacts.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ContactsModule } from '../contacts/contacts.module';
     BullModule.registerQueue({ name: 'whatsapp' }),
     ConversationsModule,
     ContactsModule,
+    AiModule,
   ],
   controllers: [WhatsappController, WebhookController],
   providers: [WhatsappService, WebhookService, WhatsappProcessor],

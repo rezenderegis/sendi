@@ -28,7 +28,22 @@ export class Contact {
   name: string;
 
   @Column({ nullable: true })
+  whatsappName: string;
+
+  @Column({ nullable: true })
   email: string;
+
+  @Column({ nullable: true })
+  avatarUrl: string;
+
+  @Column({ nullable: true })
+  companyName: string;
+
+  @Column({ nullable: true })
+  notes: string;
+
+  @Column({ nullable: true, unique: false })
+  externalId: string;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;

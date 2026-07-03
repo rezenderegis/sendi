@@ -188,6 +188,46 @@ export class WhatsappService {
     return { success: true, data: response.data };
   }
 
+  async sendBotReply(
+    whatsappNumber: WhatsappNumber,
+    to: string,
+    text: string,
+    conversationId: string,
+    companyId: string,
+  ): Promise<void> {
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const response = await axios.post(
+      `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'text',
+        text: { body: text },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const whatsappMessageId = response.data?.messages?.[0]?.id;
+
+    await this.conversationsService.saveMessage({
+      conversationId,
+      companyId,
+      direction: MessageDirection.OUTBOUND,
+      type: MessageType.TEXT,
+      content: text,
+      whatsappMessageId,
+      status: MessageStatus.SENT,
+    });
+  }
+
   async processInboundMessage(payload: any): Promise<void> {
     const entry = payload.entry?.[0];
     const changes = entry?.changes?.[0];
@@ -206,6 +246,13 @@ export class WhatsappService {
     const messages = value.messages || [];
     const statuses = value.statuses || [];
 
+    const contactsIndex: Record<string, string> = {};
+    for (const c of value.contacts || []) {
+      if (c.wa_id && c.profile?.name) {
+        contactsIndex[c.wa_id] = c.profile.name;
+      }
+    }
+
     for (const msg of messages) {
       await this.whatsappQueue.add(
         'inbound-message',
@@ -213,6 +260,7 @@ export class WhatsappService {
           message: msg,
           whatsappNumber,
           companyId: whatsappNumber.companyId,
+          whatsappName: contactsIndex[msg.from] || null,
         },
         { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
       );
