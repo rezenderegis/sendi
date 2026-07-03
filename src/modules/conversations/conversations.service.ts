@@ -165,6 +165,15 @@ export class ConversationsService {
     await this.conversationRepository.update(conversationId, { aiState: state });
   }
 
+  async getRecentMessages(conversationId: string, limit = 10): Promise<Message[]> {
+    const messages = await this.messageRepository.find({
+      where: { conversationId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+    return messages.reverse();
+  }
+
   async enableBot(id: string, companyId: string): Promise<void> {
     await this.findById(id, companyId);
     await this.conversationRepository.update(id, { aiState: null });

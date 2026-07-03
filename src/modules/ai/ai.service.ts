@@ -48,7 +48,11 @@ export class AiService {
     });
   }
 
-  async chat(contactName: string, userMessage: string, systemPrompt?: string | null): Promise<string> {
+  async chat(
+    contactName: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+    systemPrompt?: string | null,
+  ): Promise<string> {
     const template = systemPrompt || DEFAULT_SYSTEM_PROMPT;
     const resolvedPrompt = template.replace('${contactName}', contactName);
 
@@ -57,7 +61,7 @@ export class AiService {
       max_tokens: 200,
       messages: [
         { role: 'system', content: resolvedPrompt },
-        { role: 'user', content: userMessage },
+        ...history,
       ],
     });
 

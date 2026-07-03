@@ -139,7 +139,12 @@ export class WhatsappProcessor {
           companyId,
         );
       } else {
-        const reply = await this.aiService.chat(contact.name, content, whatsappNumber.systemPrompt);
+        const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, 10);
+        const history = recentMessages.map((msg) => ({
+          role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+          content: msg.content,
+        }));
+        const reply = await this.aiService.chat(contact.name, history, whatsappNumber.systemPrompt);
         await this.whatsappService.sendBotReply(
           whatsappNumber,
           fromPhone,
