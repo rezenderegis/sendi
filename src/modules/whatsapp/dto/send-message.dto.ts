@@ -39,6 +39,10 @@ export class UpdateWhatsappNumberDto {
   @IsString()
   @IsOptional()
   systemPrompt?: string;
+
+  @ApiPropertyOptional({ example: 20, description: 'Quantidade de mensagens recentes enviadas ao LLM como contexto' })
+  @IsOptional()
+  botHistoryLimit?: number;
 }
 
 export class ConnectNumberDto {

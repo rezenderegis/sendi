@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ContactsService } from '../contacts/contacts.service';
-import { AiService } from '../ai/ai.service';
+import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 
@@ -139,7 +139,7 @@ export class WhatsappProcessor {
           companyId,
         );
       } else {
-        const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, 10);
+        const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, whatsappNumber.botHistoryLimit ?? DEFAULT_BOT_HISTORY_LIMIT);
         const history = recentMessages.map((msg) => ({
           role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
           content: msg.content,

@@ -47,6 +47,9 @@ export class WhatsappNumber {
   @Column({ type: 'text', nullable: true })
   systemPrompt: string | null;
 
+  @Column({ type: 'int', default: 20 })
+  botHistoryLimit: number;
+
   @CreateDateColumn()
   createdAt: Date;
 
