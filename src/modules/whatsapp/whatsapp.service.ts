@@ -243,6 +243,7 @@ export class WhatsappService {
     conversationId: string,
     companyId: string,
     aiPromptSource?: string,
+    metadata?: Record<string, any>,
   ): Promise<void> {
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
@@ -275,6 +276,7 @@ export class WhatsappService {
       whatsappMessageId,
       status: MessageStatus.SENT,
       aiPromptSource: aiPromptSource ?? null,
+      metadata: metadata ?? undefined,
     });
   }
 

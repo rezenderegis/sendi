@@ -101,6 +101,15 @@ export class WhatsappProcessor {
     const { message, whatsappNumber, companyId, whatsappName } = job.data;
 
     try {
+      // Idempotência: a Meta pode reenviar o mesmo webhook várias vezes
+      const alreadyProcessed = await this.messageRepo.findOne({
+        where: { whatsappMessageId: message.id, companyId },
+      });
+      if (alreadyProcessed) {
+        this.logger.log(`Mensagem ${message.id} já processada, ignorando retry`);
+        return;
+      }
+
       const fromPhone = message.from;
       const contact = await this.contactsService.findOrCreateByPhone(
         fromPhone,
@@ -293,7 +302,8 @@ export class WhatsappProcessor {
     });
 
     if (!message || message.direction !== MessageDirection.OUTBOUND) return;
-    if (message.type !== MessageType.TEXT) return; // templates precisam de lógica diferente
+    if (message.type !== MessageType.TEXT) return;
+    if (message.metadata?.isRetry) return; // evita loop infinito de retries
 
     const contact = message.conversation?.contact;
     if (!contact) return;
@@ -306,14 +316,18 @@ export class WhatsappProcessor {
     );
 
     try {
-      await this.whatsappService.sendMessage(whatsappNumber.companyId, {
-        whatsappNumberId: whatsappNumber.id,
-        to: alt,
-        type: 'text',
-        message: message.content,
-      });
+      // Usa sendBotReply para reutilizar a conversa existente — sendMessage criaria novo contato/conversa
+      const fullNumber = await this.whatsappService.findById(whatsappNumber.id, whatsappNumber.companyId);
+      await this.whatsappService.sendBotReply(
+        fullNumber,
+        alt,
+        message.content,
+        message.conversationId,
+        message.companyId,
+        undefined,
+        { isRetry: true, originalMessageId: whatsappMessageId },
+      );
 
-      // Atualiza o contato para o número que funcionou
       await this.contactsService.updatePhone(contact.id, contact.companyId, alt);
       this.logger.log(`Retry bem-sucedido: contato ${contact.id} atualizado para ${alt}`);
     } catch (err) {
