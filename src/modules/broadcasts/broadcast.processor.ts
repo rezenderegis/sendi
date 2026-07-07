@@ -6,6 +6,7 @@ import { Job } from 'bull';
 import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
 import { Conversation, ConversationStatus } from '../conversations/conversation.entity';
+import { ConversationEvent, ConversationEventType } from '../conversations/conversation-event.entity';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 const CAMPAIGN_CONTEXT_HOURS = 72;
@@ -21,6 +22,8 @@ export class BroadcastProcessor {
     private readonly recipientRepo: Repository<BroadcastRecipient>,
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
+    @InjectRepository(ConversationEvent)
+    private readonly eventRepo: Repository<ConversationEvent>,
     private readonly whatsappService: WhatsappService,
   ) {}
 
@@ -90,6 +93,19 @@ export class BroadcastProcessor {
         conversation.campaignBroadcastId = broadcast.id;
         conversation.campaignExpiresAt = expiresAt;
         await this.conversationRepo.save(conversation);
+
+        await this.eventRepo.save(
+          this.eventRepo.create({
+            conversationId: conversation.id,
+            type: ConversationEventType.CAMPAIGN_ACTIVATED,
+            metadata: {
+              broadcastId: broadcast.id,
+              broadcastName: broadcast.name,
+              promptPreview: broadcast.campaignPrompt.slice(0, 120),
+              expiresAt,
+            },
+          }),
+        );
       }
     } catch (err) {
       recipient.status = RecipientStatus.FAILED;

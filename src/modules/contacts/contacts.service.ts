@@ -8,6 +8,7 @@ import { Tag } from '../tags/tag.entity';
 const TAG_COLUMNS = ['tag', 'tags', 'etiqueta', 'etiquetas'];
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
+import { normalizePhone, phoneAlternative } from '../../common/utils/phone.util';
 
 const COLUMN_MAP: Record<string, string> = {
   nome: 'name', name: 'name',
@@ -80,14 +81,30 @@ export class ContactsService {
     companyId: string,
     whatsappName?: string,
   ): Promise<Contact> {
+    const normalized = normalizePhone(phone);
+
     let contact = await this.contactRepository.findOne({
-      where: { phone, companyId },
+      where: { phone: normalized, companyId },
     });
+
+    // Fallback: tenta o formato alternativo (com/sem 9º dígito) caso o contato tenha sido
+    // criado antes da normalização ou com o formato diferente do webhook
+    if (!contact) {
+      const alt = phoneAlternative(normalized);
+      if (alt) {
+        contact = await this.contactRepository.findOne({ where: { phone: alt, companyId } });
+        if (contact) {
+          // Migra para o formato normalizado (com 9)
+          contact.phone = normalized;
+          await this.contactRepository.save(contact);
+        }
+      }
+    }
 
     if (!contact) {
       contact = this.contactRepository.create({
-        phone,
-        name: whatsappName || phone,
+        phone: normalized,
+        name: whatsappName || normalized,
         whatsappName: whatsappName || null,
         companyId,
       });
@@ -131,14 +148,45 @@ export class ContactsService {
   }
 
   async findByTag(tagId: string, companyId: string): Promise<Contact[]> {
-    return this.contactRepository
-      .createQueryBuilder('c')
-      .innerJoin('c.tags', 'tag')
-      .leftJoinAndSelect('c.tags', 'tags')
-      .where('c.companyId = :companyId', { companyId })
-      .andWhere('tag.id = :tagId', { tagId })
-      .orderBy('c.name', 'ASC')
-      .getMany();
+    const [byContactTag, byConversationTag] = await Promise.all([
+      // Contatos marcados diretamente via contact_tags
+      this.contactRepository
+        .createQueryBuilder('c')
+        .innerJoin('c.tags', 'tag')
+        .leftJoinAndSelect('c.tags', 'tags')
+        .where('c.companyId = :companyId', { companyId })
+        .andWhere('tag.id = :tagId', { tagId })
+        .getMany(),
+      // Contatos cujas conversas têm esta tag via conversation_tags
+      this.contactRepository
+        .createQueryBuilder('c')
+        .innerJoin(
+          'conversations',
+          'conv',
+          'conv."contactId" = c.id AND conv."companyId" = :companyId',
+          { companyId },
+        )
+        .innerJoin(
+          'conversation_tags',
+          'ct',
+          'ct."conversationId" = conv.id AND ct."tagId" = :tagId',
+          { tagId },
+        )
+        .leftJoinAndSelect('c.tags', 'tags')
+        .where('c.companyId = :companyId', { companyId })
+        .getMany(),
+    ]);
+
+    const seen = new Set<string>();
+    const result: Contact[] = [];
+    for (const c of [...byContactTag, ...byConversationTag]) {
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        result.push(c);
+      }
+    }
+    result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    return result;
   }
 
   async delete(id: string, companyId: string): Promise<void> {
@@ -202,7 +250,7 @@ export class ContactsService {
         continue;
       }
 
-      const phone = rawPhone.replace(/\D/g, '');
+      const phone = normalizePhone(rawPhone);
       try {
         // Resolve tags da linha
         const tagNames: string[] = [];
@@ -214,7 +262,12 @@ export class ContactsService {
         }
         const tags = tagNames.length ? await this.findOrCreateTags([...new Set(tagNames)], companyId) : [];
 
+        const alt = phoneAlternative(phone);
         let contact = await this.contactRepository.findOne({ where: { phone, companyId } });
+        if (!contact && alt) {
+          contact = await this.contactRepository.findOne({ where: { phone: alt, companyId } });
+          if (contact) contact.phone = phone; // migra para formato com 9
+        }
         if (contact) {
           if (row['name']) contact.name = row['name'];
           if ('email' in row) contact.email = row['email'] || null;

@@ -69,6 +69,9 @@ export class Message {
   metadata: Record<string, any>;
 
   @Column({ nullable: true })
+  aiPromptSource: string | null;
+
+  @Column({ nullable: true })
   sentAt: Date;
 
   @Column({ nullable: true })

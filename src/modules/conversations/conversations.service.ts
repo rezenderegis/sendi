@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Conversation, ConversationStatus } from './conversation.entity';
+import { ConversationEvent, ConversationEventType } from './conversation-event.entity';
 import { Message, MessageDirection, MessageStatus, MessageType } from './message.entity';
 import { Tag } from '../tags/tag.entity';
 
@@ -14,7 +15,27 @@ export class ConversationsService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(Tag)
     private readonly tagRepository: Repository<Tag>,
+    @InjectRepository(ConversationEvent)
+    private readonly eventRepository: Repository<ConversationEvent>,
   ) {}
+
+  async createEvent(
+    conversationId: string,
+    type: ConversationEventType,
+    metadata?: Record<string, any>,
+  ): Promise<void> {
+    await this.eventRepository.save(
+      this.eventRepository.create({ conversationId, type, metadata: metadata ?? null }),
+    );
+  }
+
+  async getEvents(id: string, companyId: string): Promise<ConversationEvent[]> {
+    await this.findById(id, companyId);
+    return this.eventRepository.find({
+      where: { conversationId: id },
+      order: { createdAt: 'DESC' },
+    });
+  }
 
   async findAll(
     companyId: string,
@@ -146,6 +167,7 @@ export class ConversationsService {
     whatsappMessageId?: string;
     status?: MessageStatus;
     metadata?: Record<string, any>;
+    aiPromptSource?: string;
   }): Promise<Message> {
     const message = this.messageRepository.create({
       ...data,
@@ -179,13 +201,18 @@ export class ConversationsService {
     await this.conversationRepository.update(id, { aiState: null });
   }
 
-  async resetCampaignContext(id: string, companyId: string): Promise<void> {
+  async resetCampaignContext(
+    id: string,
+    companyId: string,
+    eventType = ConversationEventType.CAMPAIGN_RESET_MANUAL,
+  ): Promise<void> {
     await this.findById(id, companyId);
     await this.conversationRepository.update(id, {
       campaignPrompt: null,
       campaignBroadcastId: null,
       campaignExpiresAt: null,
     });
+    await this.createEvent(id, eventType);
   }
 
   async updateMessageStatus(

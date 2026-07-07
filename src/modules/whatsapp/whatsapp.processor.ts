@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job } from 'bull';
 import { ConversationsService } from '../conversations/conversations.service';
+import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
@@ -208,12 +209,33 @@ export class WhatsappProcessor {
           content: msg.content,
         }));
         const now = new Date();
-        const activeCampaignPrompt =
+        const campaignStillActive =
           conversation.campaignPrompt &&
           conversation.campaignExpiresAt &&
-          conversation.campaignExpiresAt > now
-            ? conversation.campaignPrompt
-            : null;
+          conversation.campaignExpiresAt > now;
+        const campaignExpiredNow =
+          conversation.campaignPrompt &&
+          conversation.campaignExpiresAt &&
+          conversation.campaignExpiresAt <= now;
+
+        if (campaignExpiredNow) {
+          await this.conversationsService.createEvent(
+            conversation.id,
+            ConversationEventType.CAMPAIGN_EXPIRED,
+            { expiredAt: conversation.campaignExpiresAt },
+          );
+        }
+
+        const activeCampaignPrompt = campaignStillActive ? conversation.campaignPrompt : null;
+        let aiPromptSource: string;
+        if (activeCampaignPrompt) {
+          aiPromptSource = 'campaign';
+        } else if (whatsappNumber.systemPrompt) {
+          aiPromptSource = 'system';
+        } else {
+          aiPromptSource = 'default';
+        }
+
         const reply = await this.aiService.chat(contact.name, history, activeCampaignPrompt ?? whatsappNumber.systemPrompt);
         await this.whatsappService.sendBotReply(
           whatsappNumber,
@@ -221,6 +243,7 @@ export class WhatsappProcessor {
           reply,
           conversation.id,
           companyId,
+          aiPromptSource,
         );
       }
     } catch (error) {

@@ -147,4 +147,13 @@ export class ConversationsController {
   ) {
     return this.conversationsService.resetCampaignContext(id, companyId);
   }
+
+  @Get(':id/events')
+  @ApiOperation({ summary: 'Histórico de eventos da conversa (contexto de campanha)' })
+  getEvents(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.conversationsService.getEvents(id, companyId);
+  }
 }

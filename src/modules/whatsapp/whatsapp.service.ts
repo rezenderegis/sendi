@@ -12,7 +12,9 @@ import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { ConversationsService } from '../conversations/conversations.service';
+import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
+import { normalizePhone } from '../../common/utils/phone.util';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
@@ -116,12 +118,13 @@ export class WhatsappService {
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
+    const to = normalizePhone(dto.to);
     const isTemplate = dto.type === 'template';
 
     const body: any = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: dto.to,
+      to,
     };
 
     if (isTemplate) {
@@ -171,7 +174,7 @@ export class WhatsappService {
     }
 
     const contact = await this.contactsService.findOrCreateByPhone(
-      dto.to,
+      to,
       companyId,
     );
 
@@ -192,7 +195,11 @@ export class WhatsappService {
     });
 
     if (conversation.campaignPrompt) {
-      await this.conversationsService.resetCampaignContext(conversation.id, companyId);
+      await this.conversationsService.resetCampaignContext(
+        conversation.id,
+        companyId,
+        ConversationEventType.CAMPAIGN_RESET_HUMAN,
+      );
     }
 
     return { message, whatsappMessageId };
@@ -229,6 +236,7 @@ export class WhatsappService {
     text: string,
     conversationId: string,
     companyId: string,
+    aiPromptSource?: string,
   ): Promise<void> {
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
@@ -260,6 +268,7 @@ export class WhatsappService {
       content: text,
       whatsappMessageId,
       status: MessageStatus.SENT,
+      aiPromptSource: aiPromptSource ?? null,
     });
   }
 
