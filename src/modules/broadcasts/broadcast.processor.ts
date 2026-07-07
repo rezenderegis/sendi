@@ -49,12 +49,14 @@ export class BroadcastProcessor {
     }
 
     try {
-      const contactName = recipient.contact.name || recipient.contact.phone;
-      const firstName = contactName.split(' ')[0];
+      const hasName = !!(recipient.contact.name && recipient.contact.name !== recipient.contact.phone);
+      const fullName = hasName ? recipient.contact.name : null;
+      const firstName = hasName ? recipient.contact.name.split(' ')[0] : null;
       const personalizedMessage = broadcast.message
         ? broadcast.message
-            .replace(/\{\{nome\}\}/gi, contactName)
-            .replace(/\{\{primeiro_nome\}\}/gi, firstName)
+            .replace(/,?\s*\{\{nome\}\}/gi, fullName ?? '')
+            .replace(/,?\s*\{\{primeiro_nome\}\}/gi, firstName ?? '')
+            .trim()
         : undefined;
 
       await this.whatsappService.sendMessage(broadcast.companyId, {
