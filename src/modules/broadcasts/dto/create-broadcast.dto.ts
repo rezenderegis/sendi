@@ -39,6 +39,44 @@ export class CreateBroadcastDto {
   campaignPrompt?: string;
 }
 
+export class UpdateBroadcastDto {
+  @ApiPropertyOptional({ example: 'Promoção Julho 2025' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-do-numero-whatsapp' })
+  @IsOptional()
+  @IsUUID()
+  whatsappNumberId?: string;
+
+  @ApiPropertyOptional({ enum: BroadcastType })
+  @IsOptional()
+  @IsEnum(BroadcastType)
+  type?: BroadcastType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  templateName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  templateLanguage?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  campaignPrompt?: string;
+}
+
 export class AddRecipientsDto {
   @ApiPropertyOptional({ type: [String], example: ['uuid-contato-1', 'uuid-contato-2'] })
   @IsOptional()

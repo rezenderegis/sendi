@@ -11,7 +11,7 @@ import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
 import { Conversation } from '../conversations/conversation.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
-import { CreateBroadcastDto, AddRecipientsDto } from './dto/create-broadcast.dto';
+import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
 
 @Injectable()
 export class BroadcastsService {
@@ -55,6 +55,15 @@ export class BroadcastsService {
     const broadcast = await this.broadcastRepo.findOne({ where: { id, companyId } });
     if (!broadcast) throw new NotFoundException('Broadcast não encontrado');
     return broadcast;
+  }
+
+  async update(id: string, companyId: string, dto: UpdateBroadcastDto): Promise<Broadcast> {
+    const broadcast = await this.findById(id, companyId);
+    if (broadcast.status !== BroadcastStatus.DRAFT) {
+      throw new BadRequestException('Só é possível editar broadcasts com status draft');
+    }
+    Object.assign(broadcast, dto);
+    return this.broadcastRepo.save(broadcast);
   }
 
   async addRecipients(

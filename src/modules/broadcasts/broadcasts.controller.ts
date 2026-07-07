@@ -4,12 +4,13 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BroadcastsService } from './broadcasts.service';
-import { AddRecipientsDto, CreateBroadcastDto } from './dto/create-broadcast.dto';
+import { AddRecipientsDto, CreateBroadcastDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -43,6 +44,16 @@ export class BroadcastsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.service.findById(id, companyId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Editar broadcast em rascunho' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: UpdateBroadcastDto,
+  ) {
+    return this.service.update(id, companyId, dto);
   }
 
   @Post(':id/recipients')
