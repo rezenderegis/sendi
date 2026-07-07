@@ -9,7 +9,7 @@ import { ContactsService } from '../contacts/contacts.service';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
-import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
+import { BroadcastRecipient, RecipientStatus } from '../broadcasts/broadcast-recipient.entity';
 import { phoneAlternative } from '../../common/utils/phone.util';
 
 const HUMAN_WORDS = [
@@ -274,7 +274,7 @@ export class WhatsappProcessor {
 
       if (!validStatuses.includes(messageStatus)) return;
 
-      await this.conversationsService.updateMessageStatus(
+      const updatedMessage = await this.conversationsService.updateMessageStatus(
         status.id,
         messageStatus,
         parseInt(status.timestamp, 10),
@@ -282,9 +282,20 @@ export class WhatsappProcessor {
 
       this.logger.log(`Status atualizado: ${status.id} -> ${status.status}`);
 
-      // Retry com número alternativo (12 ↔ 13 dígitos) quando Meta recusa entrega
-      if (messageStatus === MessageStatus.FAILED && whatsappNumber) {
-        await this.retryWithAlternativePhone(status.id, whatsappNumber);
+      if (messageStatus === MessageStatus.FAILED) {
+        // Marca recipient do broadcast como failed para aparecer na página de falhas
+        const recipientId = updatedMessage?.metadata?.broadcastRecipientId;
+        if (recipientId) {
+          await this.recipientRepo.update(
+            { id: recipientId },
+            { status: RecipientStatus.FAILED, error: 'Falha na entrega (Meta)' },
+          );
+        }
+
+        // Retry com número alternativo (12 ↔ 13 dígitos)
+        if (whatsappNumber) {
+          await this.retryWithAlternativePhone(status.id, whatsappNumber);
+        }
       }
     } catch (error) {
       this.logger.error(`Erro ao processar status update: ${error.message}`, error.stack);

@@ -72,6 +72,7 @@ export class BroadcastProcessor {
         campaignPrompt: broadcast.campaignPrompt ?? undefined,
         campaignBroadcastId: broadcast.id,
         campaignExpiresAt,
+        broadcastRecipientId: recipient.id,
       });
 
       recipient.status = RecipientStatus.SENT;

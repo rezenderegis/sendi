@@ -191,6 +191,7 @@ export class WhatsappService {
       content: messageContent,
       whatsappMessageId,
       status: MessageStatus.SENT,
+      metadata: dto.broadcastRecipientId ? { broadcastRecipientId: dto.broadcastRecipientId } : undefined,
     });
 
     if (dto.campaignPrompt && dto.campaignExpiresAt) {

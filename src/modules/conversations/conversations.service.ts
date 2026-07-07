@@ -268,11 +268,11 @@ export class ConversationsService {
     whatsappMessageId: string,
     status: MessageStatus,
     timestamp: number,
-  ): Promise<void> {
+  ): Promise<Message | null> {
     const message = await this.messageRepository.findOne({
       where: { whatsappMessageId },
     });
-    if (!message) return;
+    if (!message) return null;
 
     const date = new Date(timestamp * 1000);
     message.status = status;
@@ -283,6 +283,6 @@ export class ConversationsService {
       message.readAt = date;
     }
 
-    await this.messageRepository.save(message);
+    return this.messageRepository.save(message);
   }
 }

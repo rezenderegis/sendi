@@ -43,6 +43,10 @@ export class SendMessageDto {
 
   @IsOptional()
   campaignExpiresAt?: Date;
+
+  @IsUUID()
+  @IsOptional()
+  broadcastRecipientId?: string;
 }
 
 export class UpdateWhatsappNumberDto {
