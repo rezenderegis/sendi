@@ -144,15 +144,51 @@ export class ConversationsService {
       },
     });
 
+    const now = new Date();
+
+    const hasActiveCampaign = (c: Conversation) =>
+      !!(c.campaignPrompt && c.campaignExpiresAt && c.campaignExpiresAt > now);
+
+    const findActiveCampaignElsewhere = () =>
+      this.conversationRepository
+        .createQueryBuilder('c')
+        .where('c.companyId = :companyId', { companyId })
+        .andWhere('c.contactId = :contactId', { contactId })
+        .andWhere('c.campaignPrompt IS NOT NULL')
+        .andWhere('c.campaignExpiresAt > :now', { now })
+        .andWhere('c.status = :status', { status: ConversationStatus.OPEN })
+        .orderBy('c.campaignExpiresAt', 'DESC')
+        .getOne();
+
     if (!conversation) {
+      // Se o contato respondeu em outro número mas tem campanha ativa lá, herda o contexto
+      const campaignSource = await findActiveCampaignElsewhere();
+
       conversation = this.conversationRepository.create({
         companyId,
         contactId,
         whatsappNumberId,
         status: ConversationStatus.OPEN,
         lastMessageAt: new Date(),
+        ...(campaignSource ? {
+          campaignPrompt: campaignSource.campaignPrompt,
+          campaignBroadcastId: campaignSource.campaignBroadcastId,
+          campaignExpiresAt: campaignSource.campaignExpiresAt,
+        } : {}),
       });
       conversation = await this.conversationRepository.save(conversation);
+    } else if (!hasActiveCampaign(conversation)) {
+      // Conversa existe mas sem campanha ativa — verifica se há campanha em outro número
+      const campaignSource = await findActiveCampaignElsewhere();
+      if (campaignSource) {
+        const patch = {
+          campaignPrompt: campaignSource.campaignPrompt,
+          campaignBroadcastId: campaignSource.campaignBroadcastId,
+          campaignExpiresAt: campaignSource.campaignExpiresAt,
+        };
+        await this.conversationRepository.update(conversation.id, patch);
+        Object.assign(conversation, patch);
+      }
     }
 
     return conversation;

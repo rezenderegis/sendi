@@ -10,6 +10,7 @@ import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
+import { normalizePhone } from '../../common/utils/phone.util';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -98,7 +99,7 @@ export class WhatsappProcessor {
     const { message, whatsappNumber, companyId, whatsappName } = job.data;
 
     try {
-      const fromPhone = message.from;
+      const fromPhone = normalizePhone(message.from);
       const contact = await this.contactsService.findOrCreateByPhone(
         fromPhone,
         companyId,
