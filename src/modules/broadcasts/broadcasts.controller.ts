@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -91,6 +92,15 @@ export class BroadcastsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.service.listRecipients(id, companyId);
+  }
+
+  @Get('failures')
+  @ApiOperation({ summary: 'Listar falhas de entrega de todos os broadcasts' })
+  listFailures(
+    @CurrentUser('companyId') companyId: string,
+    @Query('broadcastId') broadcastId?: string,
+  ) {
+    return this.service.listFailures(companyId, broadcastId);
   }
 
   @Get(':id/responses')

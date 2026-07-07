@@ -13,6 +13,18 @@ import { Conversation } from '../conversations/conversation.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
 import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
 
+export interface FailureRow {
+  id: string;
+  broadcastId: string;
+  broadcastName: string;
+  contactId: string;
+  contactName: string;
+  contactPhone: string;
+  error: string | null;
+  sentAt: Date | null;
+  createdAt: Date;
+}
+
 @Injectable()
 export class BroadcastsService {
   constructor(
@@ -176,6 +188,33 @@ export class BroadcastsService {
       relations: ['contact'],
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async listFailures(companyId: string, broadcastId?: string): Promise<FailureRow[]> {
+    const qb = this.recipientRepo
+      .createQueryBuilder('r')
+      .innerJoinAndSelect('r.contact', 'contact')
+      .innerJoinAndSelect('r.broadcast', 'broadcast')
+      .where('broadcast.companyId = :companyId', { companyId })
+      .andWhere('r.status = :status', { status: RecipientStatus.FAILED })
+      .orderBy('r.createdAt', 'DESC');
+
+    if (broadcastId) {
+      qb.andWhere('r.broadcastId = :broadcastId', { broadcastId });
+    }
+
+    const rows = await qb.getMany();
+    return rows.map((r) => ({
+      id: r.id,
+      broadcastId: r.broadcastId,
+      broadcastName: r.broadcast.name,
+      contactId: r.contactId,
+      contactName: r.contact.name,
+      contactPhone: r.contact.phone,
+      error: r.error,
+      sentAt: r.sentAt,
+      createdAt: r.createdAt,
+    }));
   }
 
   async getResponses(id: string, companyId: string) {
