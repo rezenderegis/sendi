@@ -1,11 +1,14 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Job } from 'bull';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
+import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -32,11 +35,48 @@ const ACTION_WORDS = [
   'me coloca', 'me manda', 'me passa', 'me transfere',
 ];
 
+function normalize(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 function isRequestingHuman(text: string): boolean {
-  const normalized = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const hasHuman = HUMAN_WORDS.some((w) => normalized.includes(w));
-  const hasAction = ACTION_WORDS.some((w) => normalized.includes(w));
+  const n = normalize(text);
+  const hasHuman = HUMAN_WORDS.some((w) => n.includes(w));
+  const hasAction = ACTION_WORDS.some((w) => n.includes(w));
   return hasHuman && hasAction;
+}
+
+const SUPPORT_PHRASES = [
+  'ja sou cliente',
+  'sou cliente',
+  'sou seu cliente',
+  'ja contratei',
+  'contratei voces',
+  'meu projeto',
+  'projeto de voces',
+  'projeto que voces',
+  'sistema de voces',
+  'sistema que voces',
+  'app de voces',
+  'aplicativo de voces',
+  'suporte tecnico',
+  'preciso de suporte',
+  'quero suporte',
+  'problema no projeto',
+  'problema no sistema',
+  'nao esta funcionando',
+  'nao funciona',
+  'deu erro',
+  'esta com erro',
+  'bug',
+  'prazo do projeto',
+  'entrega do projeto',
+  'atraso no projeto',
+];
+
+function isSupportRequest(text: string): boolean {
+  const n = normalize(text);
+  return SUPPORT_PHRASES.some((phrase) => n.includes(normalize(phrase)));
 }
 
 @Processor('whatsapp')
@@ -48,6 +88,8 @@ export class WhatsappProcessor {
     private readonly contactsService: ContactsService,
     private readonly aiService: AiService,
     private readonly whatsappService: WhatsappService,
+    @InjectRepository(BroadcastRecipient)
+    private readonly recipientRepo: Repository<BroadcastRecipient>,
   ) {}
 
   @Process('inbound-message')
@@ -103,6 +145,18 @@ export class WhatsappProcessor {
 
       this.logger.log(`Mensagem inbound processada: ${message.id} de ${fromPhone}`);
 
+      // Classificar sentimento na primeira resposta de campanha
+      if (conversation.campaignBroadcastId && message.type === 'text') {
+        const recipient = await this.recipientRepo.findOne({
+          where: { broadcastId: conversation.campaignBroadcastId, contactId: contact.id },
+        });
+        if (recipient && !recipient.respondedAt) {
+          recipient.respondedAt = new Date();
+          recipient.responseSentiment = await this.aiService.classifySentiment(content) as any;
+          await this.recipientRepo.save(recipient);
+        }
+      }
+
       if (message.type !== 'text') return;
 
       if (conversation.aiState === 'human_requested') return;
@@ -129,6 +183,15 @@ export class WhatsappProcessor {
           conversation.id,
           companyId,
         );
+      } else if (isSupportRequest(content)) {
+        await this.conversationsService.updateAiState(conversation.id, 'human_requested');
+        await this.whatsappService.sendBotReply(
+          whatsappNumber,
+          fromPhone,
+          'Entendido! Vou chamar nossa equipe de suporte. Em breve um especialista entrará em contato com você. 👋',
+          conversation.id,
+          companyId,
+        );
       } else if (isRequestingHuman(content)) {
         await this.conversationsService.updateAiState(conversation.id, 'human_requested');
         await this.whatsappService.sendBotReply(
@@ -144,7 +207,14 @@ export class WhatsappProcessor {
           role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
           content: msg.content,
         }));
-        const reply = await this.aiService.chat(contact.name, history, whatsappNumber.systemPrompt);
+        const now = new Date();
+        const activeCampaignPrompt =
+          conversation.campaignPrompt &&
+          conversation.campaignExpiresAt &&
+          conversation.campaignExpiresAt > now
+            ? conversation.campaignPrompt
+            : null;
+        const reply = await this.aiService.chat(contact.name, history, activeCampaignPrompt ?? whatsappNumber.systemPrompt);
         await this.whatsappService.sendBotReply(
           whatsappNumber,
           fromPhone,

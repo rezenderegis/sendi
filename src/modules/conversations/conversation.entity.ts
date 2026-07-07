@@ -76,6 +76,15 @@ export class Conversation {
   @Column({ nullable: true })
   aiState: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  campaignPrompt: string | null;
+
+  @Column({ nullable: true })
+  campaignBroadcastId: string | null;
+
+  @Column({ nullable: true })
+  campaignExpiresAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

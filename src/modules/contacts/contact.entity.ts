@@ -3,11 +3,14 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Company } from '../companies/company.entity';
+import { Tag } from '../tags/tag.entity';
 
 @Entity('contacts')
 export class Contact {
@@ -50,6 +53,14 @@ export class Contact {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @ManyToMany(() => Tag)
+  @JoinTable({
+    name: 'contact_tags',
+    joinColumn: { name: 'contactId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
 
   @UpdateDateColumn()
   updatedAt: Date;

@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { WhatsappNumber } from './whatsapp-number.entity';
+import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ContactsService } from '../contacts/contacts.service';
@@ -23,6 +24,8 @@ export class WhatsappService {
   constructor(
     @InjectRepository(WhatsappNumber)
     private readonly whatsappNumberRepository: Repository<WhatsappNumber>,
+    @InjectRepository(WhatsappTemplate)
+    private readonly whatsappTemplateRepository: Repository<WhatsappTemplate>,
     private readonly configService: ConfigService,
     private readonly conversationsService: ConversationsService,
     private readonly contactsService: ContactsService,
@@ -145,6 +148,28 @@ export class WhatsappService {
 
     const whatsappMessageId = response.data?.messages?.[0]?.id;
 
+    let messageContent = isTemplate ? `template:${dto.templateName}` : dto.message;
+    if (isTemplate) {
+      try {
+        const tplRes = await axios.get(
+          `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
+          {
+            params: { name: dto.templateName, fields: 'name,components' },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          },
+        );
+        const tplData = tplRes.data?.data?.[0];
+        const bodyComponent = tplData?.components?.find(
+          (c: any) => c.type === 'BODY',
+        );
+        if (bodyComponent?.text) {
+          messageContent = bodyComponent.text;
+        }
+      } catch {
+        // fallback to template name if fetch fails
+      }
+    }
+
     const contact = await this.contactsService.findOrCreateByPhone(
       dto.to,
       companyId,
@@ -161,10 +186,14 @@ export class WhatsappService {
       companyId,
       direction: MessageDirection.OUTBOUND,
       type: isTemplate ? MessageType.TEMPLATE : MessageType.TEXT,
-      content: isTemplate ? `template:${dto.templateName}` : dto.message,
+      content: messageContent,
       whatsappMessageId,
       status: MessageStatus.SENT,
     });
+
+    if (conversation.campaignPrompt) {
+      await this.conversationsService.resetCampaignContext(conversation.id, companyId);
+    }
 
     return { message, whatsappMessageId };
   }
@@ -231,6 +260,56 @@ export class WhatsappService {
       content: text,
       whatsappMessageId,
       status: MessageStatus.SENT,
+    });
+  }
+
+  async syncTemplates(id: string, companyId: string): Promise<{ synced: number }> {
+    const whatsappNumber = await this.findById(id, companyId);
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const response = await axios.get(
+      `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
+      {
+        params: { fields: 'id,name,language,status,category,components', limit: 100 },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    const templates: any[] = response.data?.data || [];
+
+    for (const tpl of templates) {
+      const bodyComponent = tpl.components?.find((c: any) => c.type === 'BODY');
+      const bodyText: string | null = bodyComponent?.text || null;
+      const variablesCount = bodyText
+        ? new Set((bodyText.match(/\{\{\d+\}\}/g) || [])).size
+        : 0;
+
+      await this.whatsappTemplateRepository.upsert(
+        {
+          companyId,
+          whatsappNumberId: whatsappNumber.id,
+          metaId: String(tpl.id),
+          name: tpl.name,
+          language: tpl.language,
+          status: tpl.status,
+          category: tpl.category || null,
+          bodyText,
+          variablesCount,
+          syncedAt: new Date(),
+        },
+        ['whatsappNumberId', 'metaId'],
+      );
+    }
+
+    return { synced: templates.length };
+  }
+
+  async listTemplates(id: string, companyId: string): Promise<WhatsappTemplate[]> {
+    await this.findById(id, companyId);
+    return this.whatsappTemplateRepository.find({
+      where: { whatsappNumberId: id, companyId },
+      order: { name: 'ASC' },
     });
   }
 

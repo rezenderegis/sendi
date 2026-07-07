@@ -13,6 +13,9 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { TagsModule } from './modules/tags/tags.module';
+import { SavedMessagesModule } from './modules/saved-messages/saved-messages.module';
+import { BroadcastsModule } from './modules/broadcasts/broadcasts.module';
+import { CampaignPromptsModule } from './modules/campaign-prompts/campaign-prompts.module';
 
 @Module({
   imports: [
@@ -73,6 +76,9 @@ import { TagsModule } from './modules/tags/tags.module';
     ConversationsModule,
     ContactsModule,
     TagsModule,
+    SavedMessagesModule,
+    BroadcastsModule,
+    CampaignPromptsModule,
   ],
   controllers: [HealthController],
 })

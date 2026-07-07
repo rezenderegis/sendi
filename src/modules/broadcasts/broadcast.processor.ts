@@ -1,0 +1,96 @@
+import { Logger } from '@nestjs/common';
+import { Process, Processor } from '@nestjs/bull';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Job } from 'bull';
+import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
+import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
+import { Conversation } from '../conversations/conversation.entity';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
+
+const CAMPAIGN_CONTEXT_HOURS = 72;
+
+@Processor('broadcast')
+export class BroadcastProcessor {
+  private readonly logger = new Logger(BroadcastProcessor.name);
+
+  constructor(
+    @InjectRepository(Broadcast)
+    private readonly broadcastRepo: Repository<Broadcast>,
+    @InjectRepository(BroadcastRecipient)
+    private readonly recipientRepo: Repository<BroadcastRecipient>,
+    @InjectRepository(Conversation)
+    private readonly conversationRepo: Repository<Conversation>,
+    private readonly whatsappService: WhatsappService,
+  ) {}
+
+  @Process('send-message')
+  async handleSendMessage(job: Job<{ broadcastId: string; recipientId: string }>) {
+    const { broadcastId, recipientId } = job.data;
+
+    const broadcast = await this.broadcastRepo.findOne({ where: { id: broadcastId } });
+    if (!broadcast) return;
+
+    if (broadcast.status === BroadcastStatus.PAUSED) return;
+
+    const recipient = await this.recipientRepo.findOne({
+      where: { id: recipientId },
+      relations: ['contact'],
+    });
+    if (!recipient || recipient.status !== RecipientStatus.PENDING) return;
+
+    if (broadcast.status === BroadcastStatus.QUEUED) {
+      broadcast.status = BroadcastStatus.SENDING;
+      broadcast.startedAt = broadcast.startedAt || new Date();
+      await this.broadcastRepo.save(broadcast);
+    }
+
+    try {
+      await this.whatsappService.sendMessage(broadcast.companyId, {
+        whatsappNumberId: broadcast.whatsappNumberId,
+        to: recipient.contact.phone,
+        type: broadcast.type === BroadcastType.TEMPLATE ? 'template' : 'text',
+        message: broadcast.message ?? undefined,
+        templateName: broadcast.templateName ?? undefined,
+        templateLanguage: broadcast.templateLanguage ?? undefined,
+      });
+
+      recipient.status = RecipientStatus.SENT;
+      recipient.sentAt = new Date();
+      broadcast.sentCount++;
+
+      // Grava contexto de campanha na conversa se o broadcast tiver campaignPrompt
+      if (broadcast.campaignPrompt) {
+        const conversation = await this.conversationRepo.findOne({
+          where: {
+            companyId: broadcast.companyId,
+            whatsappNumberId: broadcast.whatsappNumberId,
+            contactId: recipient.contactId,
+          },
+        });
+        if (conversation) {
+          const expiresAt = new Date();
+          expiresAt.setHours(expiresAt.getHours() + CAMPAIGN_CONTEXT_HOURS);
+          conversation.campaignPrompt = broadcast.campaignPrompt;
+          conversation.campaignBroadcastId = broadcast.id;
+          conversation.campaignExpiresAt = expiresAt;
+          await this.conversationRepo.save(conversation);
+        }
+      }
+    } catch (err) {
+      recipient.status = RecipientStatus.FAILED;
+      recipient.error = err?.message || 'Erro desconhecido';
+      broadcast.failedCount++;
+      this.logger.warn(`Falha ao enviar para ${recipient.contact.phone}: ${recipient.error}`);
+    }
+
+    await this.recipientRepo.save(recipient);
+
+    if (broadcast.sentCount + broadcast.failedCount >= broadcast.totalCount) {
+      broadcast.status = BroadcastStatus.COMPLETED;
+      broadcast.completedAt = new Date();
+    }
+
+    await this.broadcastRepo.save(broadcast);
+  }
+}

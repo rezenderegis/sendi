@@ -17,6 +17,20 @@ FLUXO DE VENDAS — siga essa ordem:
 4. Se aceitar agendar: envie https://calendly.com/team-globalsix/30min
 5. Se preferir contato: confirme que um consultor vai entrar em contato em breve.
 
+DIFERENCIAIS DA GLOBALSIX (use para contornar objeções):
+- Equipe com mais de 20 anos de experiência em tecnologia
+- Profissionais certificados em desenvolvimento de projetos
+- Soluções 100% sob medida — não vendemos pacotes prontos
+- Suporte próximo e acompanhamento durante todo o projeto
+- Experiência com empresas de diversos segmentos e portes
+
+COMO LIDAR COM OBJEÇÕES:
+- "Está caro" ou "tem mais barato": Reconheça, mas reforce que preço baixo em tecnologia costuma sair caro depois. Destaque a experiência da equipe e que o projeto é feito sob medida para durar. Ex: "Entendo. Só que com mais de 20 anos de experiência, nossa equipe entrega projetos que funcionam de verdade — sem retrabalho depois. Vale uma conversa rápida pra você comparar."
+- "Vou pensar": Pergunte o que falta para decidir e ofereça a reunião como um próximo passo sem compromisso. Ex: "Claro, sem pressa. Se quiser, a reunião é só pra você conhecer melhor — sem compromisso nenhum."
+- "Já tenho fornecedor": Pergunte se está satisfeito e plante uma dúvida sobre qualidade ou prazo. Ex: "Tudo bem! Só curiosidade — você está satisfeito com os prazos e resultados que tem hoje?"
+- "Não tenho orçamento agora": Valide e mantenha o contato. Ex: "Faz sentido. Posso deixar nosso contato com você pra quando o momento chegar?"
+- Nunca seja agressivo ou insistente. Uma objeção bem tratada abre porta, forçar fecha.
+
 REGRAS IMPORTANTES:
 - Nunca faça mais de 1 pergunta por mensagem.
 - Se o cliente já respondeu a mesma pergunta antes no histórico, NÃO repita a pergunta. Use a resposta que já foi dada.
@@ -41,6 +55,30 @@ export class AiService {
     this.client = new OpenAI({
       apiKey: this.configService.get<string>('OPENAI_API_KEY'),
     });
+  }
+
+  async classifySentiment(text: string): Promise<'positive' | 'negative' | 'neutral'> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Classifique o sentimento desta mensagem do cliente como exatamente uma dessas palavras: positive, negative, neutral. Responda apenas a palavra, sem pontuação.',
+          },
+          { role: 'user', content: text },
+        ],
+      });
+      const result = response.choices[0]?.message?.content?.trim().toLowerCase();
+      if (result === 'positive' || result === 'negative' || result === 'neutral') {
+        return result;
+      }
+    } catch (err) {
+      this.logger.warn(`Falha ao classificar sentimento: ${err.message}`);
+    }
+    return 'neutral';
   }
 
   async chat(

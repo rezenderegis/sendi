@@ -179,6 +179,15 @@ export class ConversationsService {
     await this.conversationRepository.update(id, { aiState: null });
   }
 
+  async resetCampaignContext(id: string, companyId: string): Promise<void> {
+    await this.findById(id, companyId);
+    await this.conversationRepository.update(id, {
+      campaignPrompt: null,
+      campaignBroadcastId: null,
+      campaignExpiresAt: null,
+    });
+  }
+
   async updateMessageStatus(
     whatsappMessageId: string,
     status: MessageStatus,

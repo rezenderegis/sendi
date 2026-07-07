@@ -137,4 +137,14 @@ export class ConversationsController {
   ) {
     return this.conversationsService.removeTag(id, companyId, tagId);
   }
+
+  @Patch(':id/campaign/reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Resetar contexto de campanha da conversa' })
+  resetCampaignContext(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.conversationsService.resetCampaignContext(id, companyId);
+  }
 }

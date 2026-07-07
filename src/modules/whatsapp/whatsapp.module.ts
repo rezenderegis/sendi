@@ -7,13 +7,15 @@ import { WebhookController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
 import { WhatsappProcessor } from './whatsapp.processor';
 import { WhatsappNumber } from './whatsapp-number.entity';
+import { WhatsappTemplate } from './whatsapp-template.entity';
+import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappNumber]),
+    TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, BroadcastRecipient]),
     BullModule.registerQueue({ name: 'whatsapp' }),
     ConversationsModule,
     ContactsModule,

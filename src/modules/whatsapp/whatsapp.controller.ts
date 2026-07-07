@@ -14,7 +14,10 @@ import { WhatsappService } from './whatsapp.service';
 import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { UserRole } from '../users/user.entity';
 
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
@@ -49,7 +52,9 @@ export class WhatsappController {
   }
 
   @Delete('numbers/:id')
-  @ApiOperation({ summary: 'Remover número' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.OWNER)
+  @ApiOperation({ summary: 'Remover número (somente owner)' })
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
@@ -64,6 +69,24 @@ export class WhatsappController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.whatsappService.sendTestMessage(id, companyId);
+  }
+
+  @Post('numbers/:id/templates/sync')
+  @ApiOperation({ summary: 'Sincronizar templates aprovados da Meta' })
+  syncTemplates(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.whatsappService.syncTemplates(id, companyId);
+  }
+
+  @Get('numbers/:id/templates')
+  @ApiOperation({ summary: 'Listar templates do número' })
+  listTemplates(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.whatsappService.listTemplates(id, companyId);
   }
 
   @Post('messages/send')
