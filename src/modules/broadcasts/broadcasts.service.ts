@@ -183,24 +183,34 @@ export class BroadcastsService {
 
     await Promise.all(
       sentRecipients.map(async (r) => {
-        const conversation = await this.conversationRepo.findOne({
+        // Busca todas as conversas do contato para este número — pode haver mais de uma (aberta + fechadas antigas)
+        const conversations = await this.conversationRepo.find({
           where: {
             companyId: broadcast.companyId,
             whatsappNumberId: broadcast.whatsappNumberId,
             contactId: r.contactId,
           },
+          order: { lastMessageAt: 'DESC' },
         });
 
-        const afterSentAt = r.sentAt ?? new Date(0);
+        const afterSentAt = r.sentAt ? new Date(r.sentAt) : new Date(0);
 
-        const inboundMessages = conversation
-          ? await this.messageRepo
-              .find({
-                where: { conversationId: conversation.id, direction: MessageDirection.INBOUND },
-                order: { createdAt: 'ASC' },
-              })
-              .then((msgs) => msgs.filter((m) => m.createdAt > afterSentAt))
-          : [];
+        // Agrega mensagens inbound de todas as conversas após o envio
+        const inboundMessages =
+          conversations.length > 0
+            ? await this.messageRepo
+                .createQueryBuilder('m')
+                .where('m."conversationId" IN (:...ids)', {
+                  ids: conversations.map((c) => c.id),
+                })
+                .andWhere('m.direction = :direction', { direction: MessageDirection.INBOUND })
+                .andWhere('m."createdAt" > :after', { after: afterSentAt })
+                .orderBy('m."createdAt"', 'ASC')
+                .getMany()
+            : [];
+
+        // Conversa principal = a mais recente (onde está a última mensagem)
+        const mainConversation = conversations[0] ?? null;
 
         if (inboundMessages.length === 0) {
           noResponse.push({
@@ -209,14 +219,16 @@ export class BroadcastsService {
             contactName: r.contact.name,
             contactPhone: r.contact.phone,
             sentAt: r.sentAt,
-            conversationId: conversation?.id ?? null,
-            conversationStatus: conversation?.status ?? null,
+            conversationId: mainConversation?.id ?? null,
+            conversationStatus: mainConversation?.status ?? null,
           });
         } else {
           const firstMsg = inboundMessages[0];
           const respondedAt = r.respondedAt ?? firstMsg.createdAt;
           const responseTimeMinutes = r.sentAt
-            ? Math.floor((new Date(respondedAt).getTime() - new Date(r.sentAt).getTime()) / 60000)
+            ? Math.floor(
+                (new Date(respondedAt).getTime() - new Date(r.sentAt).getTime()) / 60000,
+              )
             : null;
 
           responses.push({
@@ -227,8 +239,8 @@ export class BroadcastsService {
             sentAt: r.sentAt,
             respondedAt,
             responseTimeMinutes,
-            conversationId: conversation?.id ?? null,
-            conversationStatus: conversation?.status ?? null,
+            conversationId: mainConversation?.id ?? null,
+            conversationStatus: mainConversation?.status ?? null,
             sentiment: r.responseSentiment,
             messages: inboundMessages.slice(0, 5).map((m) => ({
               content: m.content,
