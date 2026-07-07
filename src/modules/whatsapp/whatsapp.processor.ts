@@ -8,9 +8,9 @@ import { ConversationEventType } from '../conversations/conversation-event.entit
 import { ContactsService } from '../contacts/contacts.service';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
-import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
+import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
-import { normalizePhone } from '../../common/utils/phone.util';
+import { phoneAlternative } from '../../common/utils/phone.util';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -92,6 +92,8 @@ export class WhatsappProcessor {
     private readonly whatsappService: WhatsappService,
     @InjectRepository(BroadcastRecipient)
     private readonly recipientRepo: Repository<BroadcastRecipient>,
+    @InjectRepository(Message)
+    private readonly messageRepo: Repository<Message>,
   ) {}
 
   @Process('inbound-message')
@@ -99,7 +101,7 @@ export class WhatsappProcessor {
     const { message, whatsappNumber, companyId, whatsappName } = job.data;
 
     try {
-      const fromPhone = normalizePhone(message.from);
+      const fromPhone = message.from;
       const contact = await this.contactsService.findOrCreateByPhone(
         fromPhone,
         companyId,
@@ -255,7 +257,7 @@ export class WhatsappProcessor {
 
   @Process('status-update')
   async handleStatusUpdate(job: Job) {
-    const { status } = job.data;
+    const { status, whatsappNumber } = job.data;
 
     try {
       const messageStatus = status.status as MessageStatus;
@@ -270,9 +272,52 @@ export class WhatsappProcessor {
       );
 
       this.logger.log(`Status atualizado: ${status.id} -> ${status.status}`);
+
+      // Retry com número alternativo (12 ↔ 13 dígitos) quando Meta recusa entrega
+      if (messageStatus === MessageStatus.FAILED && whatsappNumber) {
+        await this.retryWithAlternativePhone(status.id, whatsappNumber);
+      }
     } catch (error) {
       this.logger.error(`Erro ao processar status update: ${error.message}`, error.stack);
       throw error;
+    }
+  }
+
+  private async retryWithAlternativePhone(
+    whatsappMessageId: string,
+    whatsappNumber: any,
+  ): Promise<void> {
+    const message = await this.messageRepo.findOne({
+      where: { whatsappMessageId },
+      relations: ['conversation', 'conversation.contact'],
+    });
+
+    if (!message || message.direction !== MessageDirection.OUTBOUND) return;
+    if (message.type !== MessageType.TEXT) return; // templates precisam de lógica diferente
+
+    const contact = message.conversation?.contact;
+    if (!contact) return;
+
+    const alt = phoneAlternative(contact.phone);
+    if (!alt) return;
+
+    this.logger.warn(
+      `Mensagem ${whatsappMessageId} falhou para ${contact.phone}, tentando alternativo ${alt}`,
+    );
+
+    try {
+      await this.whatsappService.sendMessage(whatsappNumber.companyId, {
+        whatsappNumberId: whatsappNumber.id,
+        to: alt,
+        type: 'text',
+        message: message.content,
+      });
+
+      // Atualiza o contato para o número que funcionou
+      await this.contactsService.updatePhone(contact.id, contact.companyId, alt);
+      this.logger.log(`Retry bem-sucedido: contato ${contact.id} atualizado para ${alt}`);
+    } catch (err) {
+      this.logger.warn(`Retry também falhou para ${alt}: ${err.message}`);
     }
   }
 }

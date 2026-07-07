@@ -93,11 +93,6 @@ export class ContactsService {
       const alt = phoneAlternative(normalized);
       if (alt) {
         contact = await this.contactRepository.findOne({ where: { phone: alt, companyId } });
-        if (contact) {
-          // Migra para o formato normalizado (com 9)
-          contact.phone = normalized;
-          await this.contactRepository.save(contact);
-        }
       }
     }
 
@@ -191,6 +186,10 @@ export class ContactsService {
     }
     result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return result;
+  }
+
+  async updatePhone(id: string, companyId: string, phone: string): Promise<void> {
+    await this.contactRepository.update({ id, companyId }, { phone });
   }
 
   async delete(id: string, companyId: string): Promise<void> {

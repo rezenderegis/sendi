@@ -14,7 +14,6 @@ import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
-import { normalizePhone } from '../../common/utils/phone.util';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
@@ -118,7 +117,7 @@ export class WhatsappService {
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
-    const to = normalizePhone(dto.to);
+    const to = dto.to.replace(/\D/g, '');
     const isTemplate = dto.type === 'template';
 
     const body: any = {
@@ -363,7 +362,7 @@ export class WhatsappService {
     for (const status of statuses) {
       await this.whatsappQueue.add(
         'status-update',
-        { status },
+        { status, whatsappNumber },
         { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
       );
     }
