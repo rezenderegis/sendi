@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { Job } from 'bull';
 import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
-import { Conversation } from '../conversations/conversation.entity';
+import { Conversation, ConversationStatus } from '../conversations/conversation.entity';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 const CAMPAIGN_CONTEXT_HOURS = 72;
@@ -61,21 +61,35 @@ export class BroadcastProcessor {
 
       // Grava contexto de campanha na conversa se o broadcast tiver campaignPrompt
       if (broadcast.campaignPrompt) {
-        const conversation = await this.conversationRepo.findOne({
+        // Busca conversa ABERTA — mesma lógica do findOrCreate do whatsapp processor
+        let conversation = await this.conversationRepo.findOne({
           where: {
             companyId: broadcast.companyId,
             whatsappNumberId: broadcast.whatsappNumberId,
             contactId: recipient.contactId,
+            status: ConversationStatus.OPEN,
           },
         });
-        if (conversation) {
-          const expiresAt = new Date();
-          expiresAt.setHours(expiresAt.getHours() + CAMPAIGN_CONTEXT_HOURS);
-          conversation.campaignPrompt = broadcast.campaignPrompt;
-          conversation.campaignBroadcastId = broadcast.id;
-          conversation.campaignExpiresAt = expiresAt;
-          await this.conversationRepo.save(conversation);
+
+        // Se não existe conversa aberta, cria uma para que o contexto já esteja pronto quando o cliente responder
+        if (!conversation) {
+          conversation = await this.conversationRepo.save(
+            this.conversationRepo.create({
+              companyId: broadcast.companyId,
+              whatsappNumberId: broadcast.whatsappNumberId,
+              contactId: recipient.contactId,
+              status: ConversationStatus.OPEN,
+              lastMessageAt: new Date(),
+            }),
+          );
         }
+
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + CAMPAIGN_CONTEXT_HOURS);
+        conversation.campaignPrompt = broadcast.campaignPrompt;
+        conversation.campaignBroadcastId = broadcast.id;
+        conversation.campaignExpiresAt = expiresAt;
+        await this.conversationRepo.save(conversation);
       }
     } catch (err) {
       recipient.status = RecipientStatus.FAILED;
