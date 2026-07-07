@@ -49,11 +49,19 @@ export class BroadcastProcessor {
     }
 
     try {
+      const contactName = recipient.contact.name || recipient.contact.phone;
+      const firstName = contactName.split(' ')[0];
+      const personalizedMessage = broadcast.message
+        ? broadcast.message
+            .replace(/\{\{nome\}\}/gi, contactName)
+            .replace(/\{\{primeiro_nome\}\}/gi, firstName)
+        : undefined;
+
       await this.whatsappService.sendMessage(broadcast.companyId, {
         whatsappNumberId: broadcast.whatsappNumberId,
         to: recipient.contact.phone,
         type: broadcast.type === BroadcastType.TEMPLATE ? 'template' : 'text',
-        message: broadcast.message ?? undefined,
+        message: personalizedMessage,
         templateName: broadcast.templateName ?? undefined,
         templateLanguage: broadcast.templateLanguage ?? undefined,
       });
