@@ -32,6 +32,17 @@ export class SendMessageDto {
   @IsString()
   @IsOptional()
   templateLanguage?: string;
+
+  @IsString()
+  @IsOptional()
+  campaignPrompt?: string;
+
+  @IsUUID()
+  @IsOptional()
+  campaignBroadcastId?: string;
+
+  @IsOptional()
+  campaignExpiresAt?: Date;
 }
 
 export class UpdateWhatsappNumberDto {

@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { Job } from 'bull';
 import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
-import { Conversation, ConversationStatus } from '../conversations/conversation.entity';
 import { ConversationEvent, ConversationEventType } from '../conversations/conversation-event.entity';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 
@@ -20,8 +19,6 @@ export class BroadcastProcessor {
     private readonly broadcastRepo: Repository<Broadcast>,
     @InjectRepository(BroadcastRecipient)
     private readonly recipientRepo: Repository<BroadcastRecipient>,
-    @InjectRepository(Conversation)
-    private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(ConversationEvent)
     private readonly eventRepo: Repository<ConversationEvent>,
     private readonly whatsappService: WhatsappService,
@@ -59,60 +56,38 @@ export class BroadcastProcessor {
             .trim()
         : undefined;
 
-      await this.whatsappService.sendMessage(broadcast.companyId, {
+      const campaignExpiresAt = broadcast.campaignPrompt ? (() => {
+        const d = new Date();
+        d.setHours(d.getHours() + CAMPAIGN_CONTEXT_HOURS);
+        return d;
+      })() : undefined;
+
+      const { conversationId } = await this.whatsappService.sendMessage(broadcast.companyId, {
         whatsappNumberId: broadcast.whatsappNumberId,
         to: recipient.contact.phone,
         type: broadcast.type === BroadcastType.TEMPLATE ? 'template' : 'text',
         message: personalizedMessage,
         templateName: broadcast.templateName ?? undefined,
         templateLanguage: broadcast.templateLanguage ?? undefined,
+        campaignPrompt: broadcast.campaignPrompt ?? undefined,
+        campaignBroadcastId: broadcast.id,
+        campaignExpiresAt,
       });
 
       recipient.status = RecipientStatus.SENT;
       recipient.sentAt = new Date();
       broadcast.sentCount++;
 
-      // Grava contexto de campanha na conversa se o broadcast tiver campaignPrompt
-      if (broadcast.campaignPrompt) {
-        // Busca conversa ABERTA — mesma lógica do findOrCreate do whatsapp processor
-        let conversation = await this.conversationRepo.findOne({
-          where: {
-            companyId: broadcast.companyId,
-            whatsappNumberId: broadcast.whatsappNumberId,
-            contactId: recipient.contactId,
-            status: ConversationStatus.OPEN,
-          },
-        });
-
-        // Se não existe conversa aberta, cria uma para que o contexto já esteja pronto quando o cliente responder
-        if (!conversation) {
-          conversation = await this.conversationRepo.save(
-            this.conversationRepo.create({
-              companyId: broadcast.companyId,
-              whatsappNumberId: broadcast.whatsappNumberId,
-              contactId: recipient.contactId,
-              status: ConversationStatus.OPEN,
-              lastMessageAt: new Date(),
-            }),
-          );
-        }
-
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + CAMPAIGN_CONTEXT_HOURS);
-        conversation.campaignPrompt = broadcast.campaignPrompt;
-        conversation.campaignBroadcastId = broadcast.id;
-        conversation.campaignExpiresAt = expiresAt;
-        await this.conversationRepo.save(conversation);
-
+      if (broadcast.campaignPrompt && conversationId) {
         await this.eventRepo.save(
           this.eventRepo.create({
-            conversationId: conversation.id,
+            conversationId,
             type: ConversationEventType.CAMPAIGN_ACTIVATED,
             metadata: {
               broadcastId: broadcast.id,
               broadcastName: broadcast.name,
               promptPreview: broadcast.campaignPrompt.slice(0, 120),
-              expiresAt,
+              expiresAt: campaignExpiresAt,
             },
           }),
         );

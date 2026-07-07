@@ -237,6 +237,19 @@ export class ConversationsService {
     await this.conversationRepository.update(id, { aiState: null });
   }
 
+  async setCampaignContext(
+    id: string,
+    campaignPrompt: string,
+    campaignBroadcastId: string | null,
+    campaignExpiresAt: Date,
+  ): Promise<void> {
+    await this.conversationRepository.update(id, {
+      campaignPrompt,
+      campaignBroadcastId,
+      campaignExpiresAt,
+    });
+  }
+
   async resetCampaignContext(
     id: string,
     companyId: string,

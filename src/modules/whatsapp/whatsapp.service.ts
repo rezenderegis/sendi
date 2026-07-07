@@ -193,7 +193,14 @@ export class WhatsappService {
       status: MessageStatus.SENT,
     });
 
-    if (conversation.campaignPrompt) {
+    if (dto.campaignPrompt && dto.campaignExpiresAt) {
+      await this.conversationsService.setCampaignContext(
+        conversation.id,
+        dto.campaignPrompt,
+        dto.campaignBroadcastId ?? null,
+        dto.campaignExpiresAt,
+      );
+    } else if (conversation.campaignPrompt) {
       await this.conversationsService.resetCampaignContext(
         conversation.id,
         companyId,
@@ -201,7 +208,7 @@ export class WhatsappService {
       );
     }
 
-    return { message, whatsappMessageId };
+    return { message, whatsappMessageId, conversationId: conversation.id };
   }
 
   async sendTestMessage(id: string, companyId: string): Promise<any> {
