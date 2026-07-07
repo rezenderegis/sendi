@@ -121,7 +121,11 @@ export class ContactsService {
   }
 
   async create(companyId: string, dto: CreateContactDto): Promise<Contact> {
-    const contact = this.contactRepository.create({ ...dto, companyId });
+    const contact = this.contactRepository.create({
+      ...dto,
+      phone: normalizePhone(dto.phone),
+      companyId,
+    });
     return this.contactRepository.save(contact);
   }
 

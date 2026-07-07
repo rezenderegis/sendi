@@ -23,13 +23,15 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY entrypoint.sh ./entrypoint.sh
 
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001 && \
-    chown -R nestjs:nodejs /app
+    chown -R nestjs:nodejs /app && \
+    chmod +x /app/entrypoint.sh
 
 USER nestjs
 
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["/app/entrypoint.sh"]
