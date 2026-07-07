@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { Broadcast } from './broadcast.entity';
 import { BroadcastRecipient } from './broadcast-recipient.entity';
+import { Conversation } from '../conversations/conversation.entity';
 import { ConversationEvent } from '../conversations/conversation-event.entity';
 import { Message } from '../conversations/message.entity';
 import { BroadcastsService } from './broadcasts.service';
@@ -12,7 +13,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, ConversationEvent, Message]),
+    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message]),
     BullModule.registerQueue({ name: 'broadcast' }),
     WhatsappModule,
   ],
