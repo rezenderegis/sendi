@@ -131,6 +131,12 @@ export class WhatsappService {
       body.template = {
         name: dto.templateName,
         language: { code: dto.templateLanguage || 'pt_BR' },
+        ...(dto.templateVariables?.length ? {
+          components: [{
+            type: 'body',
+            parameters: dto.templateVariables.map((v) => ({ type: 'text', text: v })),
+          }],
+        } : {}),
       };
     } else {
       body.type = 'text';

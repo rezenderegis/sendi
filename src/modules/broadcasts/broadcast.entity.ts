@@ -17,6 +17,11 @@ export enum BroadcastType {
   TEMPLATE = 'template',
 }
 
+export enum BroadcastMode {
+  STANDARD = 'standard',
+  CSV = 'csv',
+}
+
 export enum BroadcastStatus {
   DRAFT = 'draft',
   QUEUED = 'queued',
@@ -50,6 +55,9 @@ export class Broadcast {
 
   @Column({ type: 'enum', enum: BroadcastType })
   type: BroadcastType;
+
+  @Column({ type: 'enum', enum: BroadcastMode, default: BroadcastMode.STANDARD })
+  mode: BroadcastMode;
 
   @Column({ type: 'text', nullable: true })
   message: string | null;

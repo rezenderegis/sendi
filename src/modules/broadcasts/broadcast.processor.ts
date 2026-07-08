@@ -49,12 +49,12 @@ export class BroadcastProcessor {
       const hasName = !!(recipient.contact.name && recipient.contact.name !== recipient.contact.phone);
       const fullName = hasName ? recipient.contact.name : null;
       const firstName = hasName ? recipient.contact.name.split(' ')[0] : null;
-      const personalizedMessage = broadcast.message
-        ? broadcast.message
-            .replace(/,?\s*\{\{nome\}\}/gi, fullName ?? '')
-            .replace(/,?\s*\{\{primeiro_nome\}\}/gi, firstName ?? '')
-            .trim()
-        : undefined;
+
+      // CSV mode: usa mensagem/variáveis do recipient; standard: usa template do broadcast
+      const messageText = (recipient.customMessage ?? broadcast.message)
+        ?.replace(/,?\s*\{\{nome\}\}/gi, fullName ?? '')
+        ?.replace(/,?\s*\{\{primeiro_nome\}\}/gi, firstName ?? '')
+        ?.trim();
 
       const campaignExpiresAt = broadcast.campaignPrompt ? (() => {
         const d = new Date();
@@ -66,9 +66,10 @@ export class BroadcastProcessor {
         whatsappNumberId: broadcast.whatsappNumberId,
         to: recipient.contact.phone,
         type: broadcast.type === BroadcastType.TEMPLATE ? 'template' : 'text',
-        message: personalizedMessage,
+        message: messageText,
         templateName: broadcast.templateName ?? undefined,
         templateLanguage: broadcast.templateLanguage ?? undefined,
+        templateVariables: recipient.templateVariables ?? undefined,
         campaignPrompt: broadcast.campaignPrompt ?? undefined,
         campaignBroadcastId: broadcast.id,
         campaignExpiresAt,

@@ -7,8 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BroadcastsService } from './broadcasts.service';
 import { AddRecipientsDto, CreateBroadcastDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
@@ -55,6 +58,18 @@ export class BroadcastsController {
     @Body() dto: UpdateBroadcastDto,
   ) {
     return this.service.update(id, companyId, dto);
+  }
+
+  @Post(':id/recipients/csv')
+  @ApiOperation({ summary: 'Importar destinatários via CSV com mensagens personalizadas' })
+  @UseInterceptors(FileInterceptor('file'))
+  addRecipientsFromCsv(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('type') type: string = 'text',
+  ) {
+    return this.service.addRecipientsFromCsv(id, companyId, file.buffer, type);
   }
 
   @Post(':id/recipients')

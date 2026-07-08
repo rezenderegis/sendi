@@ -12,6 +12,9 @@ import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entit
 import { Conversation } from '../conversations/conversation.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
 import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
+import { BroadcastMode } from './broadcast.entity';
+import { parse } from 'csv-parse/sync';
+import { normalizePhone } from '../../common/utils/phone.util';
 
 export interface FailureRow {
   id: string;
@@ -188,6 +191,119 @@ export class BroadcastsService {
       relations: ['contact'],
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async addRecipientsFromCsv(
+    id: string,
+    companyId: string,
+    buffer: Buffer,
+    broadcastType: string,
+  ): Promise<{ added: number; skipped: number; errors: { row: number; phone: string; reason: string }[] }> {
+    const broadcast = await this.findById(id, companyId);
+    if (broadcast.status !== BroadcastStatus.DRAFT) {
+      throw new BadRequestException('Só é possível adicionar destinatários em broadcasts com status draft');
+    }
+
+    const rows: Record<string, string>[] = parse(buffer, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      bom: true,
+    });
+
+    if (rows.length > 1000) {
+      throw new BadRequestException('Máximo de 1.000 linhas por CSV');
+    }
+
+    const result = { added: 0, skipped: 0, errors: [] as { row: number; phone: string; reason: string }[] };
+
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i];
+      const rawPhone = raw['telefone'] || raw['phone'] || raw['Telefone'];
+      if (!rawPhone) {
+        result.errors.push({ row: i + 2, phone: '', reason: 'Coluna telefone ausente' });
+        continue;
+      }
+
+      const phone = normalizePhone(rawPhone.replace(/\D/g, ''));
+
+      try {
+        // Valida campos obrigatórios conforme tipo
+        if (broadcastType === 'text') {
+          const msg = raw['mensagem'] || raw['message'] || raw['Mensagem'];
+          if (!msg?.trim()) {
+            result.errors.push({ row: i + 2, phone, reason: 'Coluna mensagem ausente ou vazia' });
+            continue;
+          }
+        }
+
+        // Cria ou atualiza contato
+        let contact = await this.conversationRepo.manager
+          .getRepository('Contact')
+          .findOne({ where: { phone, companyId } }) as any;
+
+        if (!contact) {
+          // tenta formato alternativo
+          const { phoneAlternative } = await import('../../common/utils/phone.util');
+          const alt = phoneAlternative(phone);
+          if (alt) {
+            contact = await this.conversationRepo.manager
+              .getRepository('Contact')
+              .findOne({ where: { phone: alt, companyId } }) as any;
+          }
+        }
+
+        const nome = raw['nome'] || raw['name'] || raw['Nome'] || '';
+
+        if (!contact) {
+          contact = await this.conversationRepo.manager.getRepository('Contact').save(
+            this.conversationRepo.manager.getRepository('Contact').create({
+              phone,
+              name: nome.trim() || phone,
+              companyId,
+            }),
+          );
+        } else if (nome.trim()) {
+          await this.conversationRepo.manager
+            .getRepository('Contact')
+            .update({ id: contact.id }, { name: nome.trim() });
+        }
+
+        // Verifica duplicata
+        const exists = await this.recipientRepo.findOne({ where: { broadcastId: id, contactId: contact.id } });
+        if (exists) { result.skipped++; continue; }
+
+        // Monta dados por tipo
+        let customMessage: string | null = null;
+        let templateVariables: string[] | null = null;
+
+        if (broadcastType === 'text') {
+          customMessage = (raw['mensagem'] || raw['message'] || raw['Mensagem']).trim();
+        } else {
+          // template: pega var1, var2, var3...
+          const vars: string[] = [];
+          let idx = 1;
+          while (raw[`var${idx}`] !== undefined) {
+            vars.push(raw[`var${idx}`]);
+            idx++;
+          }
+          if (vars.length) templateVariables = vars;
+        }
+
+        await this.recipientRepo.save(
+          this.recipientRepo.create({ broadcastId: id, contactId: contact.id, customMessage, templateVariables }),
+        );
+        result.added++;
+      } catch (err) {
+        result.errors.push({ row: i + 2, phone, reason: err.message });
+      }
+    }
+
+    broadcast.totalCount = await this.recipientRepo.count({ where: { broadcastId: id } });
+    broadcast.mode = BroadcastMode.CSV;
+    await this.broadcastRepo.save(broadcast);
+
+    return result;
   }
 
   async listFailures(companyId: string, broadcastId?: string): Promise<FailureRow[]> {

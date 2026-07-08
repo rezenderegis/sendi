@@ -48,6 +48,12 @@ export class BroadcastRecipient {
   @Column({ type: 'text', nullable: true })
   error: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  customMessage: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  templateVariables: string[] | null;
+
   @Column({ nullable: true })
   sentAt: Date | null;
 

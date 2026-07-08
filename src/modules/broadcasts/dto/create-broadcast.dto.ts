@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateIf } from 'class-validator';
-import { BroadcastType } from '../broadcast.entity';
+import { BroadcastMode, BroadcastType } from '../broadcast.entity';
 
 export class CreateBroadcastDto {
   @ApiProperty({ example: 'Promoção Julho 2025' })
@@ -37,6 +37,11 @@ export class CreateBroadcastDto {
   @IsOptional()
   @IsString()
   campaignPrompt?: string;
+
+  @ApiPropertyOptional({ enum: BroadcastMode, default: BroadcastMode.STANDARD })
+  @IsOptional()
+  @IsEnum(BroadcastMode)
+  mode?: BroadcastMode;
 }
 
 export class UpdateBroadcastDto {

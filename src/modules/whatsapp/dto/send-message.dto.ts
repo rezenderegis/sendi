@@ -47,6 +47,9 @@ export class SendMessageDto {
   @IsUUID()
   @IsOptional()
   broadcastRecipientId?: string;
+
+  @IsOptional()
+  templateVariables?: string[];
 }
 
 export class UpdateWhatsappNumberDto {
