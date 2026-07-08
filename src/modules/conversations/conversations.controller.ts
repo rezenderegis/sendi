@@ -106,6 +106,16 @@ export class ConversationsController {
     );
   }
 
+  @Post(':id/bot/disable')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Pausar bot na conversa' })
+  disableBot(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.conversationsService.disableBot(id, companyId);
+  }
+
   @Post(':id/bot/enable')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reativar bot na conversa' })

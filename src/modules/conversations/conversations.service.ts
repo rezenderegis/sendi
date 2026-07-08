@@ -237,6 +237,11 @@ export class ConversationsService {
     await this.conversationRepository.update(id, { aiState: null });
   }
 
+  async disableBot(id: string, companyId: string): Promise<void> {
+    await this.findById(id, companyId);
+    await this.conversationRepository.update(id, { aiState: 'human_requested' });
+  }
+
   async setCampaignContext(
     id: string,
     campaignPrompt: string,
