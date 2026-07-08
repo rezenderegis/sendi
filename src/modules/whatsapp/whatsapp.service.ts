@@ -143,16 +143,24 @@ export class WhatsappService {
       body.text = { body: dto.message };
     }
 
-    const response = await axios.post(
-      `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
-      body,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+    let response: any;
+    try {
+      response = await axios.post(
+        `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
+        body,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
         },
-      },
-    );
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Meta API error sending to ${to}: ${JSON.stringify(err.response?.data ?? err.message)}`,
+      );
+      throw err;
+    }
 
     const whatsappMessageId = response.data?.messages?.[0]?.id;
 
