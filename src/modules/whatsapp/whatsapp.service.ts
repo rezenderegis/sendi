@@ -300,13 +300,21 @@ export class WhatsappService {
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
-    const response = await axios.get(
-      `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
-      {
-        params: { fields: 'id,name,language,status,category,components', limit: 100 },
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-    );
+    let response: any;
+    try {
+      response = await axios.get(
+        `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
+        {
+          params: { fields: 'id,name,language,status,category,components', limit: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Meta API error syncing templates for wabaId=${whatsappNumber.wabaId}: ${JSON.stringify(err.response?.data ?? err.message)}`,
+      );
+      throw err;
+    }
 
     const templates: any[] = response.data?.data || [];
 
