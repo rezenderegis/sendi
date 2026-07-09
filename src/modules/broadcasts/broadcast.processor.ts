@@ -96,7 +96,7 @@ export class BroadcastProcessor {
       }
     } catch (err) {
       recipient.status = RecipientStatus.FAILED;
-      recipient.error = err?.message || 'Erro desconhecido';
+      recipient.error = err?.response?.data?.error?.message || err?.message || 'Erro desconhecido';
       broadcast.failedCount++;
       this.logger.warn(`Falha ao enviar para ${recipient.contact.phone}: ${recipient.error}`);
     }
