@@ -204,11 +204,21 @@ export class BroadcastsService {
       throw new BadRequestException('Só é possível adicionar destinatários em broadcasts com status draft');
     }
 
-    const rows: Record<string, string>[] = parse(buffer, {
-      columns: true,
+    const rawText = buffer.toString('utf8').replace(/^﻿/, '');
+    const firstLine = rawText.split(/\r?\n/)[0] ?? '';
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+
+    // Detecta se tem cabeçalho: primeira célula parece número de telefone
+    const firstCell = firstLine.split(delimiter)[0].trim();
+    const hasHeader = !/^\d{8,}$/.test(firstCell);
+
+    const columnNames = hasHeader ? true : ['telefone', 'nome', 'mensagem', 'var1', 'var2', 'var3', 'var4', 'var5'];
+
+    const rows: Record<string, string>[] = parse(rawText, {
+      columns: columnNames,
       skip_empty_lines: true,
       trim: true,
-      bom: true,
+      delimiter,
     });
 
     if (rows.length > 1000) {
