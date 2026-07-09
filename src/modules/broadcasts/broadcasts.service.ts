@@ -219,6 +219,7 @@ export class BroadcastsService {
       skip_empty_lines: true,
       trim: true,
       delimiter,
+      relax_column_count: true,
     });
 
     if (rows.length > 1000) {
