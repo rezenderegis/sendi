@@ -74,10 +74,14 @@ export class WhatsappService {
     return this.whatsappNumberRepository.save(number);
   }
 
-  async findAll(companyId: string): Promise<WhatsappNumber[]> {
-    return this.whatsappNumberRepository.find({
+  async findAll(companyId: string, allowedNumberIds?: string[] | null): Promise<WhatsappNumber[]> {
+    const all = await this.whatsappNumberRepository.find({
       where: { companyId, isActive: true },
     });
+    if (allowedNumberIds?.length) {
+      return all.filter((n) => allowedNumberIds.includes(n.id));
+    }
+    return all;
   }
 
   async findById(id: string, companyId: string): Promise<WhatsappNumber> {

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   ParseUUIDPipe,
@@ -30,15 +31,29 @@ export class BroadcastsController {
   @ApiOperation({ summary: 'Criar broadcast' })
   create(
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('canSendBroadcast') canSendBroadcast: boolean,
+    @CurrentUser('allowedNumberIds') allowedNumberIds: string[] | null,
     @Body() dto: CreateBroadcastDto,
   ) {
+    if (role !== 'owner' && canSendBroadcast === false) {
+      throw new ForbiddenException('Você não tem permissão para criar broadcasts');
+    }
+    if (role !== 'owner' && allowedNumberIds?.length && !allowedNumberIds.includes(dto.whatsappNumberId)) {
+      throw new ForbiddenException('Você não tem acesso a este número');
+    }
     return this.service.create(companyId, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar broadcasts' })
-  findAll(@CurrentUser('companyId') companyId: string) {
-    return this.service.findAll(companyId);
+  findAll(
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('allowedNumberIds') allowedNumberIds: string[] | null,
+  ) {
+    const numberFilter = role === 'owner' ? null : allowedNumberIds;
+    return this.service.findAll(companyId, numberFilter);
   }
 
   @Get(':id')
@@ -87,7 +102,12 @@ export class BroadcastsController {
   send(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('canSendBroadcast') canSendBroadcast: boolean,
   ) {
+    if (role !== 'owner' && canSendBroadcast === false) {
+      throw new ForbiddenException('Você não tem permissão para enviar broadcasts');
+    }
     return this.service.send(id, companyId);
   }
 

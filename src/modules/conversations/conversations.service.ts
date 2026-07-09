@@ -42,6 +42,7 @@ export class ConversationsService {
     page = 1,
     limit = 20,
     tagId?: string,
+    allowedNumberIds?: string[] | null,
   ): Promise<{ data: Conversation[]; total: number; page: number; limit: number }> {
     const qb = this.conversationRepository
       .createQueryBuilder('c')
@@ -56,6 +57,10 @@ export class ConversationsService {
 
     if (tagId) {
       qb.innerJoin('c.tags', 'filterTag', 'filterTag.id = :tagId', { tagId });
+    }
+
+    if (allowedNumberIds?.length) {
+      qb.andWhere('c.whatsappNumberId IN (:...allowedNumberIds)', { allowedNumberIds });
     }
 
     const [data, total] = await qb.getManyAndCount();

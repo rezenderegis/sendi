@@ -59,11 +59,17 @@ export class BroadcastsService {
     );
   }
 
-  findAll(companyId: string): Promise<Broadcast[]> {
-    return this.broadcastRepo.find({
-      where: { companyId },
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(companyId: string, allowedNumberIds?: string[] | null): Promise<Broadcast[]> {
+    const qb = this.broadcastRepo
+      .createQueryBuilder('b')
+      .where('b.companyId = :companyId', { companyId })
+      .orderBy('b.createdAt', 'DESC');
+
+    if (allowedNumberIds?.length) {
+      qb.andWhere('b.whatsappNumberId IN (:...allowedNumberIds)', { allowedNumberIds });
+    }
+
+    return qb.getMany();
   }
 
   async findById(id: string, companyId: string): Promise<Broadcast> {

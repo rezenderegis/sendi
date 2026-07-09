@@ -44,6 +44,15 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  allowedNumberIds: string[] | null;
+
+  @Column({ default: true })
+  canConfigureBot: boolean;
+
+  @Column({ default: true })
+  canSendBroadcast: boolean;
+
   @BeforeInsert()
   async hashPassword() {
     if (this.password) {

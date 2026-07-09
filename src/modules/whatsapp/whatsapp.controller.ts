@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   ParseUUIDPipe,
@@ -37,8 +38,13 @@ export class WhatsappController {
 
   @Get('numbers')
   @ApiOperation({ summary: 'Listar números da empresa' })
-  findAll(@CurrentUser('companyId') companyId: string) {
-    return this.whatsappService.findAll(companyId);
+  findAll(
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('allowedNumberIds') allowedNumberIds: string[] | null,
+  ) {
+    const numberFilter = role === 'owner' ? null : allowedNumberIds;
+    return this.whatsappService.findAll(companyId, numberFilter);
   }
 
   @Patch('numbers/:id')
@@ -46,8 +52,13 @@ export class WhatsappController {
   updateNumber(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('canConfigureBot') canConfigureBot: boolean,
     @Body() dto: UpdateWhatsappNumberDto,
   ) {
+    if (role !== 'owner' && canConfigureBot === false) {
+      throw new ForbiddenException('Você não tem permissão para configurar o bot');
+    }
     return this.whatsappService.updateNumber(id, companyId, dto);
   }
 

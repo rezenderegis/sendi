@@ -52,15 +52,19 @@ export class ConversationsController {
   @ApiQuery({ name: 'tagId', required: false, type: String, description: 'Filtrar por tag' })
   findAll(
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('role') role: string,
+    @CurrentUser('allowedNumberIds') allowedNumberIds: string[] | null,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
     @Query('tagId') tagId?: string,
   ) {
+    const numberFilter = role === 'owner' ? null : allowedNumberIds;
     return this.conversationsService.findAll(
       companyId,
       parseInt(page, 10),
       parseInt(limit, 10),
       tagId,
+      numberFilter,
     );
   }
 
