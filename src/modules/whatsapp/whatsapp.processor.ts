@@ -286,9 +286,13 @@ export class WhatsappProcessor {
         // Marca recipient do broadcast como failed para aparecer na página de falhas
         const recipientId = updatedMessage?.metadata?.broadcastRecipientId;
         if (recipientId) {
+          const metaError = status.errors?.[0];
+          const errorMsg = metaError
+            ? `[${metaError.code}] ${metaError.title ?? metaError.message ?? 'Falha na entrega'}`
+            : 'Falha na entrega (Meta)';
           await this.recipientRepo.update(
             { id: recipientId },
-            { status: RecipientStatus.FAILED, error: 'Falha na entrega (Meta)' },
+            { status: RecipientStatus.FAILED, error: errorMsg },
           );
         }
 
