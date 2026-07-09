@@ -322,6 +322,9 @@ export class WhatsappService {
 
     const templates: any[] = response.data?.data || [];
 
+    // Remove templates antigos do número antes de inserir os novos
+    await this.whatsappTemplateRepository.delete({ whatsappNumberId: whatsappNumber.id });
+
     for (const tpl of templates) {
       const bodyComponent = tpl.components?.find((c: any) => c.type === 'BODY');
       const bodyText: string | null = bodyComponent?.text || null;
@@ -329,8 +332,8 @@ export class WhatsappService {
         ? new Set((bodyText.match(/\{\{\d+\}\}/g) || [])).size
         : 0;
 
-      await this.whatsappTemplateRepository.upsert(
-        {
+      await this.whatsappTemplateRepository.save(
+        this.whatsappTemplateRepository.create({
           companyId,
           whatsappNumberId: whatsappNumber.id,
           metaId: String(tpl.id),
@@ -341,8 +344,7 @@ export class WhatsappService {
           bodyText,
           variablesCount,
           syncedAt: new Date(),
-        },
-        ['whatsappNumberId', 'metaId'],
+        }),
       );
     }
 
