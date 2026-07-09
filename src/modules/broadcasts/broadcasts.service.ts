@@ -206,7 +206,7 @@ export class BroadcastsService {
 
     const rawText = buffer.toString('utf8').replace(/^﻿/, '');
     const firstLine = rawText.split(/\r?\n/)[0] ?? '';
-    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const delimiter = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ',';
 
     // Detecta se tem cabeçalho: primeira célula parece número de telefone
     const firstCell = firstLine.split(delimiter)[0].trim();
