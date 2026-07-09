@@ -11,6 +11,7 @@ import {
 import { Company } from '../companies/company.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { BroadcastRecipient } from './broadcast-recipient.entity';
+import { Tag } from '../tags/tag.entity';
 
 export enum BroadcastType {
   TEXT = 'text',
@@ -91,6 +92,13 @@ export class Broadcast {
 
   @Column({ nullable: true })
   completedAt: Date | null;
+
+  @Column({ nullable: true })
+  tagId: string | null;
+
+  @ManyToOne(() => Tag, { nullable: true, eager: false })
+  @JoinColumn({ name: 'tagId' })
+  tag: Tag | null;
 
   @OneToMany(() => BroadcastRecipient, (r) => r.broadcast)
   recipients: BroadcastRecipient[];

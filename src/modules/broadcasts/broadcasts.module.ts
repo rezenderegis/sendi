@@ -10,10 +10,11 @@ import { BroadcastsService } from './broadcasts.service';
 import { BroadcastsController } from './broadcasts.controller';
 import { BroadcastProcessor } from './broadcast.processor';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { Tag } from '../tags/tag.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message]),
+    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message, Tag]),
     BullModule.registerQueue({ name: 'broadcast' }),
     WhatsappModule,
   ],

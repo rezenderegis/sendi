@@ -62,6 +62,7 @@ export class BroadcastsService {
   async findAll(companyId: string, allowedNumberIds?: string[] | null): Promise<Broadcast[]> {
     const qb = this.broadcastRepo
       .createQueryBuilder('b')
+      .leftJoinAndSelect('b.tag', 'tag')
       .where('b.companyId = :companyId', { companyId })
       .orderBy('b.createdAt', 'DESC');
 
@@ -73,7 +74,7 @@ export class BroadcastsService {
   }
 
   async findById(id: string, companyId: string): Promise<Broadcast> {
-    const broadcast = await this.broadcastRepo.findOne({ where: { id, companyId } });
+    const broadcast = await this.broadcastRepo.findOne({ where: { id, companyId }, relations: ['tag', 'whatsappNumber'] });
     if (!broadcast) throw new NotFoundException('Broadcast não encontrado');
     return broadcast;
   }
@@ -144,6 +145,7 @@ export class BroadcastsService {
     }
 
     broadcast.totalCount = await this.recipientRepo.count({ where: { broadcastId: id } });
+    if (dto.tagId) broadcast.tagId = dto.tagId;
     await this.broadcastRepo.save(broadcast);
 
     return { added, skipped };
