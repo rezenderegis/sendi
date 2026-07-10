@@ -18,6 +18,8 @@ import { BroadcastsModule } from './modules/broadcasts/broadcasts.module';
 import { CampaignPromptsModule } from './modules/campaign-prompts/campaign-prompts.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { ContactProductSettingsModule } from './modules/contact-product-settings/contact-product-settings.module';
+import { AutomationsModule } from './modules/automations/automations.module';
 
 @Module({
   imports: [
@@ -83,6 +85,8 @@ import { SalesModule } from './modules/sales/sales.module';
     CampaignPromptsModule,
     ProductsModule,
     SalesModule,
+    ContactProductSettingsModule,
+    AutomationsModule,
   ],
   controllers: [HealthController],
 })
