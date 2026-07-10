@@ -26,6 +26,9 @@ export class Product {
   @Column()
   name: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  defaultPrice: number | null;
+
   @Column({ type: 'int', nullable: true })
   repurchaseIntervalDays: number | null;
 
