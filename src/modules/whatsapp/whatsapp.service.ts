@@ -241,6 +241,11 @@ export class WhatsappService {
         );
         if (bodyComponent?.text) {
           messageContent = bodyComponent.text;
+          if (dto.templateVariables?.length) {
+            dto.templateVariables.forEach((val, idx) => {
+              messageContent = messageContent.replace(new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g'), val);
+            });
+          }
         }
       } catch {
         // fallback to template name if fetch fails
