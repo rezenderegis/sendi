@@ -164,10 +164,10 @@ export class AutomationsService {
       const day = targetDate.getDate();
       const rows = await this.ruleRepo.manager.query(
         `SELECT id, phone, name FROM contacts
-         WHERE company_id = $1
-           AND birth_date IS NOT NULL
-           AND EXTRACT(MONTH FROM birth_date::date) = $2
-           AND EXTRACT(DAY FROM birth_date::date) = $3`,
+         WHERE "companyId" = $1
+           AND "birthDate" IS NOT NULL
+           AND EXTRACT(MONTH FROM "birthDate"::date) = $2
+           AND EXTRACT(DAY FROM "birthDate"::date) = $3`,
         [companyId, month, day],
       );
       rawContacts = rows;
@@ -177,11 +177,11 @@ export class AutomationsService {
       const rows = await this.ruleRepo.manager.query(
         `SELECT c.id, c.phone, c.name, p.name AS extra
          FROM sales s
-         JOIN contacts c ON s.contact_id = c.id
-         JOIN products p ON s.product_id = p.id
-         WHERE s.company_id = $1
-           AND s.payment_status = 'pending'
-           AND s.due_date = $2`,
+         JOIN contacts c ON s."contactId" = c.id
+         JOIN products p ON s."productId" = p.id
+         WHERE s."companyId" = $1
+           AND s."paymentStatus" = 'pending'
+           AND s."dueDate" = $2`,
         [companyId, targetDateStr],
       );
       rawContacts = rows;
@@ -190,14 +190,14 @@ export class AutomationsService {
       const rows = await this.ruleRepo.manager.query(
         `SELECT c.id, c.phone, c.name, p.id AS product_id, p.name AS extra
          FROM sales s
-         JOIN contacts c ON s.contact_id = c.id
-         JOIN products p ON s.product_id = p.id
+         JOIN contacts c ON s."contactId" = c.id
+         JOIN products p ON s."productId" = p.id
          LEFT JOIN contact_product_settings cps
-           ON cps.contact_id = s.contact_id AND cps.product_id = s.product_id AND cps.company_id = s.company_id
-         WHERE s.company_id = $1
-           AND (p.repurchase_interval_days IS NOT NULL OR cps.repurchase_interval_days IS NOT NULL)
-         GROUP BY c.id, c.phone, c.name, p.id, p.name, cps.repurchase_interval_days, p.repurchase_interval_days
-         HAVING (MAX(s.sale_date::date) + (COALESCE(cps.repurchase_interval_days, p.repurchase_interval_days) || ' days')::interval)::date = $2`,
+           ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+         WHERE s."companyId" = $1
+           AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
+         GROUP BY c.id, c.phone, c.name, p.id, p.name, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
+         HAVING (MAX(s."saleDate"::date) + (COALESCE(cps."repurchaseIntervalDays", p."repurchaseIntervalDays") || ' days')::interval)::date = $2`,
         [companyId, targetDateStr],
       );
       rawContacts = rows;
@@ -263,10 +263,10 @@ export class AutomationsService {
 
   private async isOptedOut(contactId: string): Promise<boolean> {
     const rows = await this.ruleRepo.manager.query(
-      `SELECT automation_opt_out FROM contacts WHERE id = $1`,
+      `SELECT "automationOptOut" FROM contacts WHERE id = $1`,
       [contactId],
     );
-    return rows?.[0]?.automation_opt_out === true;
+    return rows?.[0]?.automationOptOut === true;
   }
 
   private async sendAndRecord(
@@ -382,10 +382,10 @@ export class AutomationsService {
 
     const contacts = await this.ruleRepo.manager.query(
       `SELECT id, phone, name FROM contacts
-       WHERE company_id = $1
-         AND birth_date IS NOT NULL
-         AND EXTRACT(MONTH FROM birth_date::date) = $2
-         AND EXTRACT(DAY FROM birth_date::date) = $3`,
+       WHERE "companyId" = $1
+         AND "birthDate" IS NOT NULL
+         AND EXTRACT(MONTH FROM "birthDate"::date) = $2
+         AND EXTRACT(DAY FROM "birthDate"::date) = $3`,
       [rule.companyId, targetMonth, targetDay],
     );
 
@@ -402,20 +402,20 @@ export class AutomationsService {
     const targetDateStr = this.toDateStr(targetDate);
 
     const sales = await this.ruleRepo.manager.query(
-      `SELECT s.id as sale_id, s.due_date, c.id, c.phone, c.name, p.name as product_name,
-              CURRENT_DATE - s.due_date::date AS dias_atraso
+      `SELECT s.id as sale_id, s."dueDate", c.id, c.phone, c.name, p.name as product_name,
+              CURRENT_DATE - s."dueDate"::date AS dias_atraso
        FROM sales s
-       JOIN contacts c ON s.contact_id = c.id
-       JOIN products p ON s.product_id = p.id
-       WHERE s.company_id = $1
-         AND s.payment_status = 'pending'
-         AND s.due_date = $2`,
+       JOIN contacts c ON s."contactId" = c.id
+       JOIN products p ON s."productId" = p.id
+       WHERE s."companyId" = $1
+         AND s."paymentStatus" = 'pending'
+         AND s."dueDate" = $2`,
       [rule.companyId, targetDateStr],
     );
 
     for (const row of sales) {
       const firstName = row.name?.split(' ')[0] || row.name || '';
-      const dueDateFormatted = row.due_date?.slice(0, 10).split('-').reverse().join('/') || '';
+      const dueDateFormatted = row.dueDate?.slice(0, 10).split('-').reverse().join('/') || '';
       const ctx = {
         nome: row.name || '',
         primeiro_nome: firstName,
@@ -435,17 +435,17 @@ export class AutomationsService {
       `SELECT
          c.id, c.phone, c.name,
          p.id AS product_id, p.name AS product_name,
-         MAX(s.sale_date::date) AS last_sale_date,
-         COALESCE(cps.repurchase_interval_days, p.repurchase_interval_days) AS interval_days
+         MAX(s."saleDate"::date) AS last_sale_date,
+         COALESCE(cps."repurchaseIntervalDays", p."repurchaseIntervalDays") AS interval_days
        FROM sales s
-       JOIN contacts c ON s.contact_id = c.id
-       JOIN products p ON s.product_id = p.id
+       JOIN contacts c ON s."contactId" = c.id
+       JOIN products p ON s."productId" = p.id
        LEFT JOIN contact_product_settings cps
-         ON cps.contact_id = s.contact_id AND cps.product_id = s.product_id AND cps.company_id = s.company_id
-       WHERE s.company_id = $1
-         AND (p.repurchase_interval_days IS NOT NULL OR cps.repurchase_interval_days IS NOT NULL)
-       GROUP BY c.id, c.phone, c.name, p.id, p.name, cps.repurchase_interval_days, p.repurchase_interval_days
-       HAVING (MAX(s.sale_date::date) + (COALESCE(cps.repurchase_interval_days, p.repurchase_interval_days) || ' days')::interval)::date = $2`,
+         ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+       WHERE s."companyId" = $1
+         AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
+       GROUP BY c.id, c.phone, c.name, p.id, p.name, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
+       HAVING (MAX(s."saleDate"::date) + (COALESCE(cps."repurchaseIntervalDays", p."repurchaseIntervalDays") || ' days')::interval)::date = $2`,
       [rule.companyId, today],
     );
 
@@ -468,20 +468,20 @@ export class AutomationsService {
       FROM automation_executions ae
       LEFT JOIN LATERAL (
         SELECT status FROM messages
-        WHERE conversation_id = ae.conversation_id
+        WHERE "conversationId" = ae."conversationId"
           AND direction = 'outbound'
-          AND created_at >= ae.created_at
-        ORDER BY created_at ASC LIMIT 1
-      ) m ON ae.conversation_id IS NOT NULL
+          AND "createdAt" >= ae."createdAt"
+        ORDER BY "createdAt" ASC LIMIT 1
+      ) m ON ae."conversationId" IS NOT NULL
       LEFT JOIN LATERAL (
         SELECT id FROM messages
-        WHERE conversation_id = ae.conversation_id
+        WHERE "conversationId" = ae."conversationId"
           AND direction = 'inbound'
-          AND created_at > ae.created_at
-          AND created_at < ae.created_at + interval '48 hours'
+          AND "createdAt" > ae."createdAt"
+          AND "createdAt" < ae."createdAt" + interval '48 hours'
         LIMIT 1
-      ) resp ON ae.conversation_id IS NOT NULL
-      WHERE ae.rule_id = $1 AND ae.company_id = $2`,
+      ) resp ON ae."conversationId" IS NOT NULL
+      WHERE ae."ruleId" = $1 AND ae."companyId" = $2`,
       [ruleId, companyId],
     );
 
@@ -502,12 +502,12 @@ export class AutomationsService {
     const { ruleId, status, page, limit } = options;
     const offset = (page - 1) * limit;
 
-    const whereClauses = [`ae.company_id = $1`];
+    const whereClauses = [`ae."companyId" = $1`];
     const params: any[] = [companyId];
     let idx = 2;
 
     if (ruleId) {
-      whereClauses.push(`ae.rule_id = $${idx++}`);
+      whereClauses.push(`ae."ruleId" = $${idx++}`);
       params.push(ruleId);
     }
     if (status) {
@@ -527,40 +527,40 @@ export class AutomationsService {
     const rows = await this.ruleRepo.manager.query(
       `SELECT
         ae.id,
-        ae.company_id as "companyId",
-        ae.rule_id as "ruleId",
+        ae."companyId",
+        ae."ruleId",
         ar.name as "ruleName",
-        ae.contact_id as "contactId",
+        ae."contactId",
         c.name as "contactName",
         c.phone as "contactPhone",
-        ae.dedupe_key as "dedupeKey",
-        ae.conversation_id as "conversationId",
-        ae.resolved_message as "resolvedMessage",
+        ae."dedupeKey",
+        ae."conversationId",
+        ae."resolvedMessage",
         ae.status,
         ae.error,
-        ae.created_at as "createdAt",
+        ae."createdAt",
         m.status as "messageStatus",
         (resp.id IS NOT NULL) as responded
       FROM automation_executions ae
-      LEFT JOIN automation_rules ar ON ar.id = ae.rule_id
-      LEFT JOIN contacts c ON c.id = ae.contact_id
+      LEFT JOIN automation_rules ar ON ar.id = ae."ruleId"
+      LEFT JOIN contacts c ON c.id = ae."contactId"
       LEFT JOIN LATERAL (
         SELECT status FROM messages
-        WHERE conversation_id = ae.conversation_id
+        WHERE "conversationId" = ae."conversationId"
           AND direction = 'outbound'
-          AND created_at >= ae.created_at
-        ORDER BY created_at ASC LIMIT 1
-      ) m ON ae.conversation_id IS NOT NULL
+          AND "createdAt" >= ae."createdAt"
+        ORDER BY "createdAt" ASC LIMIT 1
+      ) m ON ae."conversationId" IS NOT NULL
       LEFT JOIN LATERAL (
         SELECT id FROM messages
-        WHERE conversation_id = ae.conversation_id
+        WHERE "conversationId" = ae."conversationId"
           AND direction = 'inbound'
-          AND created_at > ae.created_at
-          AND created_at < ae.created_at + interval '48 hours'
+          AND "createdAt" > ae."createdAt"
+          AND "createdAt" < ae."createdAt" + interval '48 hours'
         LIMIT 1
-      ) resp ON ae.conversation_id IS NOT NULL
+      ) resp ON ae."conversationId" IS NOT NULL
       WHERE ${whereStr}
-      ORDER BY ae.created_at DESC
+      ORDER BY ae."createdAt" DESC
       LIMIT $${idx++} OFFSET $${idx++}`,
       dataParams,
     );
@@ -593,10 +593,10 @@ export class AutomationsService {
           const day = effectiveDate.getDate();
           contacts = await this.ruleRepo.manager.query(
             `SELECT id, phone, name FROM contacts
-             WHERE company_id = $1
-               AND birth_date IS NOT NULL
-               AND EXTRACT(MONTH FROM birth_date::date) = $2
-               AND EXTRACT(DAY FROM birth_date::date) = $3`,
+             WHERE "companyId" = $1
+               AND "birthDate" IS NOT NULL
+               AND EXTRACT(MONTH FROM "birthDate"::date) = $2
+               AND EXTRACT(DAY FROM "birthDate"::date) = $3`,
             [companyId, month, day],
           );
         } else if (rule.type === AutomationTriggerType.PAYMENT_OVERDUE) {
@@ -604,10 +604,10 @@ export class AutomationsService {
           const effectiveDateStr = this.toDateStr(effectiveDate);
           const sales = await this.ruleRepo.manager.query(
             `SELECT c.id, c.phone, c.name FROM sales s
-             JOIN contacts c ON s.contact_id = c.id
-             WHERE s.company_id = $1
-               AND s.payment_status = 'pending'
-               AND s.due_date = $2`,
+             JOIN contacts c ON s."contactId" = c.id
+             WHERE s."companyId" = $1
+               AND s."paymentStatus" = 'pending'
+               AND s."dueDate" = $2`,
             [companyId, effectiveDateStr],
           );
           contacts = sales;
@@ -616,14 +616,14 @@ export class AutomationsService {
           const rows = await this.ruleRepo.manager.query(
             `SELECT c.id, c.phone, c.name, p.id AS product_id
              FROM sales s
-             JOIN contacts c ON s.contact_id = c.id
-             JOIN products p ON s.product_id = p.id
+             JOIN contacts c ON s."contactId" = c.id
+             JOIN products p ON s."productId" = p.id
              LEFT JOIN contact_product_settings cps
-               ON cps.contact_id = s.contact_id AND cps.product_id = s.product_id AND cps.company_id = s.company_id
-             WHERE s.company_id = $1
-               AND (p.repurchase_interval_days IS NOT NULL OR cps.repurchase_interval_days IS NOT NULL)
-             GROUP BY c.id, c.phone, c.name, p.id, cps.repurchase_interval_days, p.repurchase_interval_days
-             HAVING (MAX(s.sale_date::date) + (COALESCE(cps.repurchase_interval_days, p.repurchase_interval_days) || ' days')::interval)::date = $2`,
+               ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+             WHERE s."companyId" = $1
+               AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
+             GROUP BY c.id, c.phone, c.name, p.id, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
+             HAVING (MAX(s."saleDate"::date) + (COALESCE(cps."repurchaseIntervalDays", p."repurchaseIntervalDays") || ' days')::interval)::date = $2`,
             [companyId, effectiveDateStr],
           );
           contacts = rows;
