@@ -34,6 +34,12 @@ export class AutomationsController {
 
   // IMPORTANT: these routes must come BEFORE /:id to avoid UUID routing conflicts
 
+  @Post('run-now')
+  @ApiOperation({ summary: 'Disparar todas as regras ativas manualmente' })
+  runNow(@CurrentUser('companyId') companyId: string) {
+    return this.automationsService.runNow(companyId);
+  }
+
   @Get('upcoming')
   @ApiOperation({ summary: 'Próximos disparos agendados' })
   getUpcoming(
@@ -106,6 +112,15 @@ export class AutomationsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.automationsService.findExecutions(companyId, id);
+  }
+
+  @Get(':id/audience')
+  @ApiOperation({ summary: 'Público da regra hoje (dry-run)' })
+  getAudience(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.automationsService.getAudience(id, companyId);
   }
 
   @Get(':id/stats')

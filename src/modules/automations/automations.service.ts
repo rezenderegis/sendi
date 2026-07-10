@@ -115,6 +115,113 @@ export class AutomationsService {
     }
   }
 
+  /** Disparo manual: roda apenas as regras ativas da empresa solicitante */
+  async runNow(companyId: string): Promise<{ triggered: number }> {
+    const activeRules = await this.ruleRepo.find({ where: { companyId, isActive: true } });
+    let triggered = 0;
+    for (const rule of activeRules) {
+      try {
+        await this.runRule(rule);
+        triggered++;
+      } catch (err) {
+        this.logger.error(`Erro ao processar regra ${rule.id}: ${err.message}`);
+      }
+    }
+    return { triggered };
+  }
+
+  /** Público da regra hoje: quem seria atingido e qual o status de cada um */
+  async getAudience(ruleId: string, companyId: string): Promise<{
+    contacts: Array<{
+      contactId: string;
+      contactName: string;
+      contactPhone: string;
+      status: 'will_send' | 'already_sent' | 'opted_out';
+      extra?: string;
+    }>;
+    total: number;
+    willSend: number;
+  }> {
+    const rule = await this.findOne(ruleId, companyId);
+    const today = new Date();
+    const todayStr = this.toDateStr(today);
+    const year = today.getFullYear();
+
+    let rawContacts: Array<{ id: string; name: string; phone: string; extra?: string }> = [];
+
+    if (rule.type === AutomationTriggerType.BIRTHDAY) {
+      const targetDate = this.addDays(today, rule.triggerOffsetDays);
+      const month = targetDate.getMonth() + 1;
+      const day = targetDate.getDate();
+      const rows = await this.ruleRepo.manager.query(
+        `SELECT id, phone, name FROM contacts
+         WHERE company_id = $1
+           AND birth_date IS NOT NULL
+           AND EXTRACT(MONTH FROM birth_date::date) = $2
+           AND EXTRACT(DAY FROM birth_date::date) = $3`,
+        [companyId, month, day],
+      );
+      rawContacts = rows;
+    } else if (rule.type === AutomationTriggerType.PAYMENT_OVERDUE) {
+      const targetDate = this.addDays(today, -rule.triggerOffsetDays);
+      const targetDateStr = this.toDateStr(targetDate);
+      const rows = await this.ruleRepo.manager.query(
+        `SELECT c.id, c.phone, c.name, p.name AS extra
+         FROM sales s
+         JOIN contacts c ON s.contact_id = c.id
+         JOIN products p ON s.product_id = p.id
+         WHERE s.company_id = $1
+           AND s.payment_status = 'pending'
+           AND s.due_date = $2`,
+        [companyId, targetDateStr],
+      );
+      rawContacts = rows;
+    } else if (rule.type === AutomationTriggerType.REPURCHASE) {
+      const targetDateStr = this.toDateStr(this.addDays(today, -rule.triggerOffsetDays));
+      const rows = await this.ruleRepo.manager.query(
+        `SELECT c.id, c.phone, c.name, p.name AS extra
+         FROM sales s
+         JOIN contacts c ON s.contact_id = c.id
+         JOIN products p ON s.product_id = p.id
+         LEFT JOIN contact_product_settings cps
+           ON cps.contact_id = s.contact_id AND cps.product_id = s.product_id AND cps.company_id = s.company_id
+         WHERE s.company_id = $1
+           AND (p.repurchase_interval_days IS NOT NULL OR cps.repurchase_interval_days IS NOT NULL)
+         GROUP BY c.id, c.phone, c.name, p.id, p.name, cps.repurchase_interval_days, p.repurchase_interval_days
+         HAVING (MAX(s.sale_date::date) + (COALESCE(cps.repurchase_interval_days, p.repurchase_interval_days) || ' days')::interval)::date = $2`,
+        [companyId, targetDateStr],
+      );
+      rawContacts = rows;
+    }
+
+    const contacts = await Promise.all(
+      rawContacts.map(async (c) => {
+        let dedupeKey = '';
+        if (rule.type === AutomationTriggerType.BIRTHDAY) dedupeKey = `birthday-${year}`;
+        else if (rule.type === AutomationTriggerType.PAYMENT_OVERDUE) dedupeKey = `overdue-check-${todayStr}`;
+        else dedupeKey = `repurchase-${c.id}-${todayStr}`;
+
+        const optedOut = await this.isOptedOut(c.id);
+        const alreadySentFlag = !optedOut && await this.alreadySent(rule.id, c.id, dedupeKey);
+
+        return {
+          contactId: c.id,
+          contactName: c.name,
+          contactPhone: c.phone,
+          extra: c.extra,
+          status: (optedOut ? 'opted_out' : alreadySentFlag ? 'already_sent' : 'will_send') as
+            'will_send' | 'already_sent' | 'opted_out',
+        };
+      }),
+    );
+
+    return {
+      contacts,
+      total: contacts.length,
+      willSend: contacts.filter((c) => c.status === 'will_send').length,
+    };
+  }
+
   private async runRule(rule: AutomationRule): Promise<void> {
     switch (rule.type) {
       case AutomationTriggerType.BIRTHDAY:
