@@ -451,7 +451,10 @@ export class AutomationsService {
 
     for (const row of rows) {
       const firstName = row.name?.split(' ')[0] || row.name || '';
-      const ctx = { nome: row.name || '', primeiro_nome: firstName, produto: row.product_name || '' };
+      const dataCompra = row.last_sale_date
+        ? String(row.last_sale_date).slice(0, 10).split('-').reverse().join('/')
+        : '';
+      const ctx = { nome: row.name || '', primeiro_nome: firstName, produto: row.product_name || '', data_compra: dataCompra };
       const dedupeKey = `repurchase-${row.product_id}-${today}`;
       await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, dedupeKey);
     }
