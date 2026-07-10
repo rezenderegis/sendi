@@ -17,7 +17,7 @@ export class ContactProductSetting {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ type: 'uuid' })
   companyId: string;
 
   @Column()

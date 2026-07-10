@@ -193,7 +193,7 @@ export class AutomationsService {
          JOIN contacts c ON s."contactId" = c.id
          JOIN products p ON s."productId" = p.id
          LEFT JOIN contact_product_settings cps
-           ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+           ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId"::uuid = s."companyId"
          WHERE s."companyId" = $1
            AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
          GROUP BY c.id, c.phone, c.name, p.id, p.name, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
@@ -441,7 +441,7 @@ export class AutomationsService {
        JOIN contacts c ON s."contactId" = c.id
        JOIN products p ON s."productId" = p.id
        LEFT JOIN contact_product_settings cps
-         ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+         ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId"::uuid = s."companyId"
        WHERE s."companyId" = $1
          AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
        GROUP BY c.id, c.phone, c.name, p.id, p.name, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
@@ -619,7 +619,7 @@ export class AutomationsService {
              JOIN contacts c ON s."contactId" = c.id
              JOIN products p ON s."productId" = p.id
              LEFT JOIN contact_product_settings cps
-               ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId" = s."companyId"
+               ON cps."contactId" = s."contactId" AND cps."productId" = s."productId" AND cps."companyId"::uuid = s."companyId"
              WHERE s."companyId" = $1
                AND (p."repurchaseIntervalDays" IS NOT NULL OR cps."repurchaseIntervalDays" IS NOT NULL)
              GROUP BY c.id, c.phone, c.name, p.id, cps."repurchaseIntervalDays", p."repurchaseIntervalDays"
