@@ -132,15 +132,72 @@ export class WhatsappService {
 
     if (isTemplate) {
       body.type = 'template';
+
+      let templateComponents: any[] = [];
+      if (dto.templateVariables?.length) {
+        // Busca estrutura do template para montar componentes corretamente
+        try {
+          const tplRes = await axios.get(
+            `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
+            {
+              params: { name: dto.templateName, fields: 'name,components' },
+              headers: { Authorization: `Bearer ${accessToken}` },
+            },
+          );
+          templateComponents = tplRes.data?.data?.[0]?.components || [];
+        } catch { /* usa só body se falhar */ }
+
+        const vars = dto.templateVariables;
+        const sendComponents: any[] = [];
+        let varIdx = 0;
+
+        for (const comp of templateComponents) {
+          if (comp.type === 'HEADER') {
+            const headerVars = (comp.text || '').match(/\{\{\d+\}\}/g) ?? [];
+            if (headerVars.length && varIdx < vars.length) {
+              sendComponents.push({
+                type: 'header',
+                parameters: headerVars.map(() => ({ type: 'text', text: vars[varIdx++] ?? '' })),
+              });
+            }
+          } else if (comp.type === 'BODY') {
+            const bodyVars = new Set((comp.text || '').match(/\{\{\d+\}\}/g) ?? []);
+            if (bodyVars.size) {
+              sendComponents.push({
+                type: 'body',
+                parameters: Array.from(bodyVars).map(() => ({ type: 'text', text: vars[varIdx++] ?? '' })),
+              });
+            }
+          } else if (comp.type === 'BUTTONS') {
+            comp.buttons?.forEach((btn: any, btnIndex: number) => {
+              const btnVars = (btn.url || '').match(/\{\{\d+\}\}/g) ?? [];
+              if (btnVars.length && varIdx < vars.length) {
+                sendComponents.push({
+                  type: 'button',
+                  sub_type: 'url',
+                  index: String(btnIndex),
+                  parameters: [{ type: 'text', text: vars[varIdx++] ?? '' }],
+                });
+              }
+            });
+          }
+        }
+
+        // Fallback: se não conseguiu estrutura, envia tudo como body
+        if (!sendComponents.length) {
+          sendComponents.push({
+            type: 'body',
+            parameters: vars.map((v) => ({ type: 'text', text: v })),
+          });
+        }
+
+        templateComponents = sendComponents;
+      }
+
       body.template = {
         name: dto.templateName,
         language: { code: dto.templateLanguage || 'pt_BR' },
-        ...(dto.templateVariables?.length ? {
-          components: [{
-            type: 'body',
-            parameters: dto.templateVariables.map((v) => ({ type: 'text', text: v })),
-          }],
-        } : {}),
+        ...(templateComponents.length ? { components: templateComponents } : {}),
       };
     } else {
       body.type = 'text';
@@ -327,10 +384,16 @@ export class WhatsappService {
 
     for (const tpl of templates) {
       const bodyComponent = tpl.components?.find((c: any) => c.type === 'BODY');
+      const headerComponent = tpl.components?.find((c: any) => c.type === 'HEADER');
+      const buttonsComponent = tpl.components?.find((c: any) => c.type === 'BUTTONS');
       const bodyText: string | null = bodyComponent?.text || null;
-      const variablesCount = bodyText
+      const headerVars = new Set((headerComponent?.text || '').match(/\{\{\d+\}\}/g) || []);
+      const buttonUrlVars = (buttonsComponent?.buttons || []).reduce((acc: number, btn: any) => {
+        return acc + ((btn.url || '').match(/\{\{\d+\}\}/g) || []).length;
+      }, 0);
+      const variablesCount = (bodyText
         ? new Set((bodyText.match(/\{\{\d+\}\}/g) || [])).size
-        : 0;
+        : 0) + headerVars.size + buttonUrlVars;
 
       await this.whatsappTemplateRepository.save(
         this.whatsappTemplateRepository.create({
