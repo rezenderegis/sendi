@@ -15,11 +15,16 @@ import {
   UseInterceptors,
   Query,
 } from '@nestjs/common';
-import { IsUUID } from 'class-validator';
+import { IsBoolean, IsUUID } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ContactsService } from './contacts.service';
 import { CreateContactDto, UpdateContactDto } from './dto/create-contact.dto';
+
+class AutomationOptOutDto {
+  @IsBoolean()
+  optOut: boolean;
+}
 
 class AddTagDto {
   @IsUUID()
@@ -104,6 +109,17 @@ export class ContactsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.contactsService.removeTag(id, companyId, tagId);
+  }
+
+  @Patch(':id/automation-optout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Atualizar opt-out de automações do contato' })
+  setAutomationOptOut(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: AutomationOptOutDto,
+  ) {
+    return this.contactsService.setAutomationOptOut(id, companyId, dto.optOut);
   }
 
   @Post('import')

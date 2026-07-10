@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -29,6 +30,35 @@ export class AutomationsController {
   @ApiOperation({ summary: 'Listar regras de automação' })
   findAll(@CurrentUser('companyId') companyId: string) {
     return this.automationsService.findAll(companyId);
+  }
+
+  // IMPORTANT: these routes must come BEFORE /:id to avoid UUID routing conflicts
+
+  @Get('upcoming')
+  @ApiOperation({ summary: 'Próximos disparos agendados' })
+  getUpcoming(
+    @CurrentUser('companyId') companyId: string,
+    @Query('days') days?: string,
+  ) {
+    const daysAhead = days ? parseInt(days, 10) : 7;
+    return this.automationsService.getUpcoming(companyId, daysAhead);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Histórico de execuções paginado' })
+  getHistory(
+    @CurrentUser('companyId') companyId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('ruleId') ruleId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.automationsService.getHistory(companyId, {
+      ruleId,
+      status,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
   }
 
   @Get(':id')
@@ -76,5 +106,24 @@ export class AutomationsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.automationsService.findExecutions(companyId, id);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Estatísticas da regra de automação' })
+  getStats(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.automationsService.getStats(id, companyId);
+  }
+
+  @Post('executions/:id/retry')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Retentar execução com falha' })
+  retryExecution(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.automationsService.retryExecution(id, companyId);
   }
 }

@@ -54,6 +54,9 @@ export class Contact {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 
+  @Column({ default: false })
+  automationOptOut: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

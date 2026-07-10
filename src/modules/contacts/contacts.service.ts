@@ -213,6 +213,12 @@ export class ContactsService {
     await this.contactRepository.update({ id, companyId }, { phone });
   }
 
+  async setAutomationOptOut(id: string, companyId: string, optOut: boolean): Promise<void> {
+    const contact = await this.findById(id, companyId);
+    contact.automationOptOut = optOut;
+    await this.contactRepository.save(contact);
+  }
+
   async delete(id: string, companyId: string): Promise<void> {
     const contact = await this.findById(id, companyId);
     await this.contactRepository.remove(contact);

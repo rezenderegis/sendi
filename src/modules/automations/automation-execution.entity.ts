@@ -47,6 +47,15 @@ export class AutomationExecution {
   @Column()
   dedupeKey: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  conversationId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  resolvedMessage: string | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  resolvedTemplateVariables: string[] | null;
+
   @Column({ type: 'enum', enum: AutomationExecutionStatus })
   status: AutomationExecutionStatus;
 
