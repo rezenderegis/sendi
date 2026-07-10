@@ -118,16 +118,16 @@ export class AutomationsService {
   /** Disparo manual: roda apenas as regras ativas da empresa solicitante */
   async runNow(companyId: string): Promise<{ triggered: number }> {
     const activeRules = await this.ruleRepo.find({ where: { companyId, isActive: true } });
-    let triggered = 0;
+    const before = await this.execRepo.count({ where: { companyId } });
     for (const rule of activeRules) {
       try {
         await this.runRule(rule);
-        triggered++;
       } catch (err) {
         this.logger.error(`Erro ao processar regra ${rule.id}: ${err.message}`);
       }
     }
-    return { triggered };
+    const after = await this.execRepo.count({ where: { companyId } });
+    return { triggered: after - before };
   }
 
   /** Público da regra hoje: quem seria atingido e qual o status de cada um */
@@ -179,7 +179,7 @@ export class AutomationsService {
     } else if (rule.type === AutomationTriggerType.REPURCHASE) {
       const targetDateStr = this.toDateStr(this.addDays(today, -rule.triggerOffsetDays));
       const rows = await this.ruleRepo.manager.query(
-        `SELECT c.id, c.phone, c.name, p.name AS extra
+        `SELECT c.id, c.phone, c.name, p.id AS product_id, p.name AS extra
          FROM sales s
          JOIN contacts c ON s.contact_id = c.id
          JOIN products p ON s.product_id = p.id
@@ -199,7 +199,7 @@ export class AutomationsService {
         let dedupeKey = '';
         if (rule.type === AutomationTriggerType.BIRTHDAY) dedupeKey = `birthday-${year}`;
         else if (rule.type === AutomationTriggerType.PAYMENT_OVERDUE) dedupeKey = `overdue-check-${todayStr}`;
-        else dedupeKey = `repurchase-${c.id}-${todayStr}`;
+        else dedupeKey = `repurchase-${(c as any).product_id ?? c.id}-${todayStr}`;
 
         const optedOut = await this.isOptedOut(c.id);
         const alreadySentFlag = !optedOut && await this.alreadySent(rule.id, c.id, dedupeKey);
