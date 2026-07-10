@@ -114,6 +114,15 @@ export class AutomationsController {
     return this.automationsService.findExecutions(companyId, id);
   }
 
+  @Post(':id/run-now')
+  @ApiOperation({ summary: 'Disparar uma regra específica manualmente' })
+  runRuleNow(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.automationsService.runRuleNow(id, companyId);
+  }
+
   @Get(':id/audience')
   @ApiOperation({ summary: 'Público da regra hoje (dry-run)' })
   getAudience(

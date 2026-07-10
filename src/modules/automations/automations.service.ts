@@ -130,6 +130,15 @@ export class AutomationsService {
     return { triggered: after - before };
   }
 
+  /** Disparo manual de uma regra específica */
+  async runRuleNow(ruleId: string, companyId: string): Promise<{ triggered: number }> {
+    const rule = await this.findOne(ruleId, companyId);
+    const before = await this.execRepo.count({ where: { companyId } });
+    await this.runRule(rule);
+    const after = await this.execRepo.count({ where: { companyId } });
+    return { triggered: after - before };
+  }
+
   /** Público da regra hoje: quem seria atingido e qual o status de cada um */
   async getAudience(ruleId: string, companyId: string): Promise<{
     contacts: Array<{
