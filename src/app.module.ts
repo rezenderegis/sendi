@@ -16,6 +16,8 @@ import { TagsModule } from './modules/tags/tags.module';
 import { SavedMessagesModule } from './modules/saved-messages/saved-messages.module';
 import { BroadcastsModule } from './modules/broadcasts/broadcasts.module';
 import { CampaignPromptsModule } from './modules/campaign-prompts/campaign-prompts.module';
+import { ProductsModule } from './modules/products/products.module';
+import { SalesModule } from './modules/sales/sales.module';
 
 @Module({
   imports: [
@@ -79,6 +81,8 @@ import { CampaignPromptsModule } from './modules/campaign-prompts/campaign-promp
     SavedMessagesModule,
     BroadcastsModule,
     CampaignPromptsModule,
+    ProductsModule,
+    SalesModule,
   ],
   controllers: [HealthController],
 })

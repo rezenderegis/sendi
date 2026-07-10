@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -37,6 +37,11 @@ export class CreateContactDto {
   @IsOptional()
   externalId?: string;
 
+  @ApiPropertyOptional({ example: '1990-05-15' })
+  @IsDateString()
+  @IsOptional()
+  birthDate?: string;
+
   @ApiPropertyOptional()
   @IsObject()
   @IsOptional()
@@ -73,6 +78,11 @@ export class UpdateContactDto {
   @IsString()
   @IsOptional()
   externalId?: string;
+
+  @ApiPropertyOptional({ example: '1990-05-15' })
+  @IsDateString()
+  @IsOptional()
+  birthDate?: string;
 
   @ApiPropertyOptional()
   @IsObject()

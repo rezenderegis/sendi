@@ -48,6 +48,9 @@ export class Contact {
   @Column({ nullable: true, unique: false })
   externalId: string;
 
+  @Column({ type: 'date', nullable: true })
+  birthDate: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 
