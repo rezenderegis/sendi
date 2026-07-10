@@ -242,7 +242,8 @@ export class BroadcastsService {
 
     for (let i = 0; i < rows.length; i++) {
       const raw = Object.fromEntries(Object.entries(rows[i]).map(([k, v]) => [k.toLowerCase().trim(), v]));
-      const rawPhone = raw['telefone'] || raw['phone'];
+      const values = Object.values(raw) as string[];
+      const rawPhone = raw['telefone'] || raw['phone'] || raw['tel'] || raw['celular'] || raw['numero'] || raw['número'] || raw['whatsapp'] || values[0];
       if (!rawPhone) {
         result.errors.push({ row: i + 2, phone: '', reason: 'Coluna telefone ausente' });
         continue;
@@ -276,7 +277,7 @@ export class BroadcastsService {
           }
         }
 
-        const nome = raw['nome'] || raw['name'] || '';
+        const nome = raw['nome'] || raw['name'] || raw['contato'] || raw['cliente'] || values[1] || '';
 
         if (!contact) {
           contact = await this.conversationRepo.manager.getRepository('Contact').save(
