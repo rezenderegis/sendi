@@ -49,6 +49,11 @@ export class CreateContactDto {
 }
 
 export class UpdateContactDto {
+  @ApiPropertyOptional({ example: '5561984402868' })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
   @ApiPropertyOptional({ example: 'José Santos' })
   @IsString()
   @IsOptional()
