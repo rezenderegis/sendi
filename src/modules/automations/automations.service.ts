@@ -402,7 +402,7 @@ export class AutomationsService {
     const targetDateStr = this.toDateStr(targetDate);
 
     const sales = await this.ruleRepo.manager.query(
-      `SELECT s.id as sale_id, s."dueDate", c.id, c.phone, c.name, p.name as product_name,
+      `SELECT s.id as sale_id, s."dueDate", s."saleDate", c.id, c.phone, c.name, p.name as product_name,
               CURRENT_DATE - s."dueDate"::date AS dias_atraso
        FROM sales s
        JOIN contacts c ON s."contactId" = c.id
@@ -416,12 +416,14 @@ export class AutomationsService {
     for (const row of sales) {
       const firstName = row.name?.split(' ')[0] || row.name || '';
       const dueDateFormatted = row.dueDate?.slice(0, 10).split('-').reverse().join('/') || '';
+      const dataCompra = row.saleDate ? String(row.saleDate).slice(0, 10).split('-').reverse().join('/') : '';
       const ctx = {
         nome: row.name || '',
         primeiro_nome: firstName,
         produto: row.product_name || '',
         data_vencimento: dueDateFormatted,
         dias_atraso: String(row.dias_atraso || 0),
+        data_compra: dataCompra,
       };
       await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, `overdue-${row.sale_id}`);
     }
