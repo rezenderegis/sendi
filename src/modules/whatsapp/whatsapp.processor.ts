@@ -129,6 +129,15 @@ export class WhatsappProcessor {
       if (message.type === 'text') {
         content = message.text?.body || '';
         type = MessageType.TEXT;
+      } else if (message.type === 'button') {
+        content = message.button?.text || '';
+        type = MessageType.TEXT;
+      } else if (message.type === 'interactive') {
+        content =
+          message.interactive?.button_reply?.title ||
+          message.interactive?.list_reply?.title ||
+          '';
+        type = MessageType.TEXT;
       } else if (message.type === 'image') {
         content = message.image?.caption || '[Imagem]';
         type = MessageType.IMAGE;
@@ -170,7 +179,7 @@ export class WhatsappProcessor {
         }
       }
 
-      if (message.type !== 'text') return;
+      if (type !== MessageType.TEXT) return;
 
       if (conversation.aiState === 'human_requested') return;
 
