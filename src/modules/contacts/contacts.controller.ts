@@ -51,6 +51,15 @@ export class ContactsController {
     return this.contactsService.findAll(companyId, broadcastId, broadcastResponseFilter);
   }
 
+  @Get('by-phone')
+  @ApiOperation({ summary: 'Buscar contato por telefone' })
+  findByPhone(
+    @CurrentUser('companyId') companyId: string,
+    @Query('phone') phone: string,
+  ) {
+    return this.contactsService.findByPhone(phone, companyId);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Criar contato' })
   create(

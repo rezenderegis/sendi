@@ -97,6 +97,18 @@ export class ContactsService {
     return contact;
   }
 
+  async findByPhone(phone: string, companyId: string): Promise<Contact | null> {
+    const normalized = normalizePhone(phone);
+    let contact = await this.contactRepository.findOne({ where: { phone: normalized, companyId } });
+    if (!contact) {
+      const alt = phoneAlternative(normalized);
+      if (alt) {
+        contact = await this.contactRepository.findOne({ where: { phone: alt, companyId } });
+      }
+    }
+    return contact ?? null;
+  }
+
   async findOrCreateByPhone(
     phone: string,
     companyId: string,
