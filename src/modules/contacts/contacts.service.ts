@@ -58,12 +58,33 @@ export class ContactsService {
     private readonly tagRepository: Repository<Tag>,
   ) {}
 
-  async findAll(companyId: string): Promise<Contact[]> {
-    return this.contactRepository.find({
-      where: { companyId },
-      relations: ['tags'],
-      order: { name: 'ASC' },
-    });
+  async findAll(
+    companyId: string,
+    broadcastId?: string,
+    broadcastResponseFilter?: string,
+  ): Promise<Contact[]> {
+    const qb = this.contactRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.tags', 'tags')
+      .where('c.companyId = :companyId', { companyId })
+      .orderBy('c.name', 'ASC');
+
+    if (broadcastId) {
+      let condition = `br."broadcastId" = :broadcastId`;
+      if (broadcastResponseFilter === 'responded') {
+        condition += ` AND br."respondedAt" IS NOT NULL`;
+      } else if (broadcastResponseFilter === 'no_response') {
+        condition += ` AND br.status = 'sent' AND br."respondedAt" IS NULL`;
+      } else if (broadcastResponseFilter === 'failed') {
+        condition += ` AND br.status = 'failed'`;
+      }
+      qb.andWhere(
+        `c.id IN (SELECT br."contactId" FROM broadcast_recipients br WHERE ${condition})`,
+        { broadcastId },
+      );
+    }
+
+    return qb.getMany();
   }
 
   async findById(id: string, companyId: string): Promise<Contact> {

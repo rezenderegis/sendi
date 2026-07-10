@@ -146,4 +146,13 @@ export class BroadcastsController {
   ) {
     return this.service.getResponses(id, companyId);
   }
+
+  @Post(':id/save-as-tag')
+  @ApiOperation({ summary: 'Salvar destinatários do broadcast como tag' })
+  saveAsTag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.saveAsTag(id, companyId);
+  }
 }

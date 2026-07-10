@@ -38,8 +38,12 @@ export class ContactsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar contatos da empresa' })
-  findAll(@CurrentUser('companyId') companyId: string) {
-    return this.contactsService.findAll(companyId);
+  findAll(
+    @CurrentUser('companyId') companyId: string,
+    @Query('broadcastId') broadcastId?: string,
+    @Query('broadcastResponseFilter') broadcastResponseFilter?: string,
+  ) {
+    return this.contactsService.findAll(companyId, broadcastId, broadcastResponseFilter);
   }
 
   @Post()

@@ -11,6 +11,7 @@ import { Broadcast, BroadcastStatus, BroadcastType } from './broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entity';
 import { Conversation } from '../conversations/conversation.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
+import { Tag } from '../tags/tag.entity';
 import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
 import { BroadcastMode } from './broadcast.entity';
 import { parse } from 'csv-parse/sync';
@@ -39,6 +40,8 @@ export class BroadcastsService {
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
+    @InjectRepository(Tag)
+    private readonly tagRepo: Repository<Tag>,
     @InjectQueue('broadcast')
     private readonly broadcastQueue: Queue,
   ) {}
@@ -469,5 +472,37 @@ export class BroadcastsService {
       responses,
       noResponse,
     };
+  }
+
+  async saveAsTag(id: string, companyId: string): Promise<Tag> {
+    const broadcast = await this.findById(id, companyId);
+
+    const tagName = `Broadcast: ${broadcast.name}`;
+    const colors = ['#3b82f6', '#8b5cf6', '#14b8a6', '#f97316', '#22c55e'];
+
+    let tag = await this.tagRepo.findOne({ where: { name: tagName, companyId } });
+    if (!tag) {
+      tag = await this.tagRepo.save(
+        this.tagRepo.create({
+          name: tagName,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          companyId,
+        }),
+      );
+    }
+
+    // Bulk insert ignorando duplicatas
+    const recipients = await this.recipientRepo.find({ where: { broadcastId: id } });
+    if (recipients.length > 0) {
+      await this.tagRepo.manager
+        .createQueryBuilder()
+        .insert()
+        .into('contact_tags')
+        .values(recipients.map((r) => ({ contactId: r.contactId, tagId: tag.id })))
+        .orIgnore()
+        .execute();
+    }
+
+    return tag;
   }
 }
