@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -55,34 +55,40 @@ export class UpdateContactDto {
   name?: string;
 
   @ApiPropertyOptional({ example: 'jose@email.com' })
+  @ValidateIf((o) => o.email != null)
   @IsEmail()
   @IsOptional()
-  email?: string;
+  email?: string | null;
 
   @ApiPropertyOptional({ example: 'Acme Ltda' })
+  @ValidateIf((o) => o.companyName != null)
   @IsString()
   @IsOptional()
-  companyName?: string;
+  companyName?: string | null;
 
   @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  @ValidateIf((o) => o.avatarUrl != null)
   @IsUrl()
   @IsOptional()
-  avatarUrl?: string;
+  avatarUrl?: string | null;
 
   @ApiPropertyOptional({ example: 'Cliente VIP, prefere contato pela manhã' })
+  @ValidateIf((o) => o.notes != null)
   @IsString()
   @IsOptional()
-  notes?: string;
+  notes?: string | null;
 
   @ApiPropertyOptional({ example: 'crm-12345' })
+  @ValidateIf((o) => o.externalId != null)
   @IsString()
   @IsOptional()
-  externalId?: string;
+  externalId?: string | null;
 
   @ApiPropertyOptional({ example: '1990-05-15' })
+  @ValidateIf((o) => o.birthDate != null)
   @IsDateString()
   @IsOptional()
-  birthDate?: string;
+  birthDate?: string | null;
 
   @ApiPropertyOptional()
   @IsObject()
