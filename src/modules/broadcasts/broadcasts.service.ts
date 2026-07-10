@@ -241,8 +241,8 @@ export class BroadcastsService {
     const result = { added: 0, skipped: 0, errors: [] as { row: number; phone: string; reason: string }[] };
 
     for (let i = 0; i < rows.length; i++) {
-      const raw = rows[i];
-      const rawPhone = raw['telefone'] || raw['phone'] || raw['Telefone'];
+      const raw = Object.fromEntries(Object.entries(rows[i]).map(([k, v]) => [k.toLowerCase().trim(), v]));
+      const rawPhone = raw['telefone'] || raw['phone'];
       if (!rawPhone) {
         result.errors.push({ row: i + 2, phone: '', reason: 'Coluna telefone ausente' });
         continue;
@@ -253,7 +253,7 @@ export class BroadcastsService {
       try {
         // Valida campos obrigatórios conforme tipo
         if (broadcastType === 'text') {
-          const msg = raw['mensagem'] || raw['message'] || raw['Mensagem'];
+          const msg = raw['mensagem'] || raw['message'];
           if (!msg?.trim()) {
             result.errors.push({ row: i + 2, phone, reason: 'Coluna mensagem ausente ou vazia' });
             continue;
@@ -276,7 +276,7 @@ export class BroadcastsService {
           }
         }
 
-        const nome = raw['nome'] || raw['name'] || raw['Nome'] || '';
+        const nome = raw['nome'] || raw['name'] || '';
 
         if (!contact) {
           contact = await this.conversationRepo.manager.getRepository('Contact').save(
@@ -301,7 +301,7 @@ export class BroadcastsService {
         let templateVariables: string[] | null = null;
 
         if (broadcastType === 'text') {
-          customMessage = (raw['mensagem'] || raw['message'] || raw['Mensagem']).trim();
+          customMessage = (raw['mensagem'] || raw['message'] || '').trim();
         } else {
           // template: pega var1, var2, var3...
           const vars: string[] = [];
