@@ -44,12 +44,30 @@ export class AutomationRule {
   @Column({ type: 'int', default: 0 })
   triggerOffsetDays: number;
 
+  @Column({ type: 'varchar', length: 10, default: 'text' })
+  messageType: 'text' | 'template';
+
   /**
-   * Template da mensagem. Variáveis suportadas:
-   * {nome}, {primeiro_nome}, {produto}, {data_vencimento}, {dias_atraso}
+   * Mensagem de texto livre. Variáveis: {nome}, {primeiro_nome}, {produto}, {data_vencimento}, {dias_atraso}
+   * Obrigatório quando messageType = 'text'.
    */
-  @Column({ type: 'text' })
-  messageTemplate: string;
+  @Column({ type: 'text', nullable: true })
+  messageTemplate: string | null;
+
+  /** Nome do template aprovado na Meta. Obrigatório quando messageType = 'template'. */
+  @Column({ nullable: true })
+  templateName: string | null;
+
+  @Column({ nullable: true, default: 'pt_BR' })
+  templateLanguage: string | null;
+
+  /**
+   * Variáveis dinâmicas do template ({{1}}, {{2}}, ...).
+   * Cada elemento pode conter texto estático ou variáveis: {nome}, {produto}, etc.
+   * Exemplo: ["{nome}", "R$ {valor}"]
+   */
+  @Column({ type: 'text', array: true, nullable: true })
+  templateVariables: string[] | null;
 
   @Column({ default: true })
   isActive: boolean;

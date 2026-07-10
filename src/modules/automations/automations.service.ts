@@ -33,7 +33,13 @@ export class AutomationsService {
   }
 
   async create(companyId: string, dto: CreateAutomationRuleDto): Promise<AutomationRule> {
-    const rule = this.ruleRepo.create({ ...dto, companyId, triggerOffsetDays: dto.triggerOffsetDays ?? 0 });
+    const rule = this.ruleRepo.create({
+      ...dto,
+      companyId,
+      triggerOffsetDays: dto.triggerOffsetDays ?? 0,
+      messageType: dto.messageType ?? 'text',
+      templateLanguage: dto.templateLanguage ?? 'pt_BR',
+    });
     return this.ruleRepo.save(rule);
   }
 
@@ -102,7 +108,7 @@ export class AutomationsService {
   private async sendAndRecord(
     rule: AutomationRule,
     contact: { id: string; phone: string; name: string },
-    message: string,
+    templateContext: Record<string, string>,
     dedupeKey: string,
   ): Promise<void> {
     if (await this.alreadySent(rule.id, contact.id, dedupeKey)) return;
@@ -111,11 +117,20 @@ export class AutomationsService {
     let error: string | null = null;
 
     try {
+      const isTemplate = rule.messageType === 'template';
+
+      const resolvedTemplateVars = isTemplate && rule.templateVariables?.length
+        ? rule.templateVariables.map((v) => this.resolveTemplate(v, templateContext))
+        : undefined;
+
       await this.whatsappService.sendMessage(rule.companyId, {
         whatsappNumberId: rule.whatsappNumberId,
         to: contact.phone,
-        type: 'text',
-        message,
+        type: isTemplate ? 'template' : 'text',
+        message: isTemplate ? undefined : this.resolveTemplate(rule.messageTemplate ?? '', templateContext),
+        templateName: isTemplate ? rule.templateName ?? undefined : undefined,
+        templateLanguage: isTemplate ? (rule.templateLanguage ?? 'pt_BR') : undefined,
+        templateVariables: resolvedTemplateVars,
       });
     } catch (err) {
       status = AutomationExecutionStatus.FAILED;
@@ -153,11 +168,8 @@ export class AutomationsService {
 
     for (const contact of contacts) {
       const firstName = contact.name?.split(' ')[0] || contact.name || '';
-      const message = this.resolveTemplate(rule.messageTemplate, {
-        nome: contact.name || '',
-        primeiro_nome: firstName,
-      });
-      await this.sendAndRecord(rule, contact, message, `birthday-${year}`);
+      const ctx = { nome: contact.name || '', primeiro_nome: firstName };
+      await this.sendAndRecord(rule, contact, ctx, `birthday-${year}`);
     }
   }
 
@@ -181,14 +193,14 @@ export class AutomationsService {
     for (const row of sales) {
       const firstName = row.name?.split(' ')[0] || row.name || '';
       const dueDateFormatted = row.due_date?.slice(0, 10).split('-').reverse().join('/') || '';
-      const message = this.resolveTemplate(rule.messageTemplate, {
+      const ctx = {
         nome: row.name || '',
         primeiro_nome: firstName,
         produto: row.product_name || '',
         data_vencimento: dueDateFormatted,
         dias_atraso: String(row.dias_atraso || 0),
-      });
-      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, message, `overdue-${row.sale_id}`);
+      };
+      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, `overdue-${row.sale_id}`);
     }
   }
 
@@ -216,13 +228,9 @@ export class AutomationsService {
 
     for (const row of rows) {
       const firstName = row.name?.split(' ')[0] || row.name || '';
-      const message = this.resolveTemplate(rule.messageTemplate, {
-        nome: row.name || '',
-        primeiro_nome: firstName,
-        produto: row.product_name || '',
-      });
+      const ctx = { nome: row.name || '', primeiro_nome: firstName, produto: row.product_name || '' };
       const dedupeKey = `repurchase-${row.product_id}-${today}`;
-      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, message, dedupeKey);
+      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, dedupeKey);
     }
   }
 }

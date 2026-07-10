@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
 import { AutomationTriggerType } from '../automation-rule.entity';
 
 export class CreateAutomationRuleDto {
@@ -16,9 +16,28 @@ export class CreateAutomationRuleDto {
   @IsOptional()
   triggerOffsetDays?: number;
 
+  @IsIn(['text', 'template'])
+  @IsOptional()
+  messageType?: 'text' | 'template';
+
+  @ValidateIf((o) => !o.messageType || o.messageType === 'text')
   @IsString()
   @IsNotEmpty()
-  messageTemplate: string;
+  messageTemplate?: string;
+
+  @ValidateIf((o) => o.messageType === 'template')
+  @IsString()
+  @IsNotEmpty()
+  templateName?: string;
+
+  @IsString()
+  @IsOptional()
+  templateLanguage?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  templateVariables?: string[];
 
   @IsBoolean()
   @IsOptional()
@@ -38,9 +57,26 @@ export class UpdateAutomationRuleDto {
   @IsOptional()
   triggerOffsetDays?: number;
 
+  @IsIn(['text', 'template'])
+  @IsOptional()
+  messageType?: 'text' | 'template';
+
   @IsString()
   @IsOptional()
   messageTemplate?: string;
+
+  @IsString()
+  @IsOptional()
+  templateName?: string;
+
+  @IsString()
+  @IsOptional()
+  templateLanguage?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  templateVariables?: string[];
 
   @IsBoolean()
   @IsOptional()
