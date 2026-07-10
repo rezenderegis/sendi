@@ -473,14 +473,14 @@ export class AutomationsService {
       FROM automation_executions ae
       LEFT JOIN LATERAL (
         SELECT status FROM messages
-        WHERE "conversationId" = ae."conversationId"
+        WHERE "conversationId" = ae."conversationId"::uuid
           AND direction = 'outbound'
           AND "createdAt" >= ae."createdAt"
         ORDER BY "createdAt" ASC LIMIT 1
       ) m ON ae."conversationId" IS NOT NULL
       LEFT JOIN LATERAL (
         SELECT id FROM messages
-        WHERE "conversationId" = ae."conversationId"
+        WHERE "conversationId" = ae."conversationId"::uuid
           AND direction = 'inbound'
           AND "createdAt" > ae."createdAt"
           AND "createdAt" < ae."createdAt" + interval '48 hours'
@@ -551,14 +551,14 @@ export class AutomationsService {
       LEFT JOIN contacts c ON c.id = ae."contactId"
       LEFT JOIN LATERAL (
         SELECT status FROM messages
-        WHERE "conversationId" = ae."conversationId"
+        WHERE "conversationId" = ae."conversationId"::uuid
           AND direction = 'outbound'
           AND "createdAt" >= ae."createdAt"
         ORDER BY "createdAt" ASC LIMIT 1
       ) m ON ae."conversationId" IS NOT NULL
       LEFT JOIN LATERAL (
         SELECT id FROM messages
-        WHERE "conversationId" = ae."conversationId"
+        WHERE "conversationId" = ae."conversationId"::uuid
           AND direction = 'inbound'
           AND "createdAt" > ae."createdAt"
           AND "createdAt" < ae."createdAt" + interval '48 hours'
