@@ -220,7 +220,11 @@ export class BroadcastsService {
     const firstCell = firstLine.split(delimiter)[0].trim();
     const hasHeader = !/^\d{8,}$/.test(firstCell);
 
-    const columnNames = hasHeader ? true : ['telefone', 'nome', 'mensagem', 'var1', 'var2', 'var3', 'var4', 'var5'];
+    const columnNames = hasHeader
+      ? true
+      : broadcastType === 'template'
+        ? ['telefone', 'nome', 'var1', 'var2', 'var3', 'var4', 'var5', 'var6']
+        : ['telefone', 'nome', 'mensagem', 'var1', 'var2', 'var3', 'var4', 'var5'];
 
     const rows: Record<string, string>[] = parse(rawText, {
       columns: columnNames,
