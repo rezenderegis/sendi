@@ -154,7 +154,7 @@ export class WhatsappService {
         for (const comp of templateComponents) {
           if (comp.type === 'HEADER') {
             const headerVars = (comp.text || '').match(/\{\{\d+\}\}/g) ?? [];
-            if (headerVars.length && varIdx < vars.length) {
+            if (headerVars.length) {
               sendComponents.push({
                 type: 'header',
                 parameters: headerVars.map(() => ({ type: 'text', text: vars[varIdx++] ?? '' })),
@@ -171,7 +171,7 @@ export class WhatsappService {
           } else if (comp.type === 'BUTTONS') {
             comp.buttons?.forEach((btn: any, btnIndex: number) => {
               const btnVars = (btn.url || '').match(/\{\{\d+\}\}/g) ?? [];
-              if (btnVars.length && varIdx < vars.length) {
+              if (btnVars.length) {
                 sendComponents.push({
                   type: 'button',
                   sub_type: 'url',
