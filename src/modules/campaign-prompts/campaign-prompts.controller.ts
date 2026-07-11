@@ -58,4 +58,23 @@ export class CampaignPromptsController {
   ) {
     return this.service.delete(id, companyId);
   }
+
+  @Get(':id/versions')
+  @ApiOperation({ summary: 'Listar versões anteriores do prompt' })
+  getVersions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.getVersions(id, companyId);
+  }
+
+  @Post(':id/restore/:versionId')
+  @ApiOperation({ summary: 'Restaurar versão anterior do prompt' })
+  restore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.restore(id, companyId, versionId);
+  }
 }
