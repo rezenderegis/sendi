@@ -178,16 +178,26 @@ export class WhatsappProcessor {
         const recipient = await this.recipientRepo.findOne({
           where: { broadcastId: conversation.campaignBroadcastId, contactId: contact.id },
         });
-        if (recipient && !recipient.respondedAt) {
+        const isFirstResponse = !!(recipient && !recipient.respondedAt);
+        if (isFirstResponse) {
           recipient.respondedAt = new Date();
           recipient.responseSentiment = await this.aiService.classifySentiment(content) as any;
           await this.recipientRepo.save(recipient);
         }
 
-        // Aplicar tag por intenção detectada
+        // Aplicar tag de resposta e intenção detectada
         const broadcast = await this.broadcastRepo.findOne({
           where: { id: conversation.campaignBroadcastId },
         });
+
+        if (isFirstResponse && broadcast?.responseTagId) {
+          try {
+            await this.conversationsService.addTag(conversation.id, companyId, broadcast.responseTagId);
+          } catch (e) {
+            this.logger.warn(`Falha ao aplicar tag de resposta: ${e.message}`);
+          }
+        }
+
         if (broadcast?.intentRules?.length) {
           const lastOutbound = await this.messageRepo.findOne({
             where: { conversationId: conversation.id, direction: MessageDirection.OUTBOUND },

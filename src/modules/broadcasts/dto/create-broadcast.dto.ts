@@ -59,6 +59,11 @@ export class CreateBroadcastDto {
   @IsOptional()
   @IsEnum(BroadcastMode)
   mode?: BroadcastMode;
+
+  @ApiPropertyOptional({ example: 'uuid-da-tag' })
+  @IsOptional()
+  @IsUUID()
+  responseTagId?: string;
 }
 
 export class UpdateBroadcastDto {
@@ -104,6 +109,11 @@ export class UpdateBroadcastDto {
   @ValidateNested({ each: true })
   @Type(() => IntentRuleDto)
   intentRules?: IntentRuleDto[];
+
+  @ApiPropertyOptional({ example: 'uuid-da-tag' })
+  @IsOptional()
+  @IsUUID()
+  responseTagId?: string;
 }
 
 export class AddRecipientsDto {
