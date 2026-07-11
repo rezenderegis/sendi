@@ -111,13 +111,6 @@ export class Broadcast {
   @JoinColumn({ name: 'tagId' })
   tag: Tag | null;
 
-  @Column({ nullable: true })
-  responseTagId: string | null;
-
-  @ManyToOne(() => Tag, { nullable: true, eager: false })
-  @JoinColumn({ name: 'responseTagId' })
-  responseTag: Tag | null;
-
   @OneToMany(() => BroadcastRecipient, (r) => r.broadcast)
   recipients: BroadcastRecipient[];
 
