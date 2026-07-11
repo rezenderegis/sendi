@@ -39,6 +39,10 @@ export class CreateAutomationRuleDto {
   @IsOptional()
   templateVariables?: string[];
 
+  @IsUUID()
+  @IsOptional()
+  campaignPromptId?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
@@ -77,6 +81,10 @@ export class UpdateAutomationRuleDto {
   @IsString({ each: true })
   @IsOptional()
   templateVariables?: string[];
+
+  @IsUUID()
+  @IsOptional()
+  campaignPromptId?: string;
 
   @IsBoolean()
   @IsOptional()

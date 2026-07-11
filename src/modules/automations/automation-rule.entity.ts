@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 
 export enum AutomationTriggerType {
   BIRTHDAY = 'birthday',
@@ -68,6 +69,16 @@ export class AutomationRule {
    */
   @Column({ type: 'text', array: true, nullable: true })
   templateVariables: string[] | null;
+
+  @Column({ nullable: true })
+  campaignPromptId: string | null;
+
+  @ManyToOne(() => CampaignPrompt, { nullable: true, eager: false, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'campaignPromptId' })
+  campaignPromptRef: CampaignPrompt | null;
+
+  @Column({ type: 'text', nullable: true })
+  campaignPrompt: string | null;
 
   @Column({ default: true })
   isActive: boolean;

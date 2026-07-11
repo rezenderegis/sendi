@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { CampaignPrompt } from './campaign-prompt.entity';
 import { PromptVersion } from './prompt-version.entity';
 import { Broadcast, BroadcastStatus } from '../broadcasts/broadcast.entity';
+import { AutomationRule } from '../automations/automation-rule.entity';
 import { CreateCampaignPromptDto, UpdateCampaignPromptDto } from './dto/campaign-prompt.dto';
 
 const MAX_VERSIONS = 20;
@@ -17,6 +18,8 @@ export class CampaignPromptsService {
     private readonly versionRepo: Repository<PromptVersion>,
     @InjectRepository(Broadcast)
     private readonly broadcastRepo: Repository<Broadcast>,
+    @InjectRepository(AutomationRule)
+    private readonly automationRuleRepo: Repository<AutomationRule>,
   ) {}
 
   findAll(companyId: string): Promise<CampaignPrompt[]> {
@@ -41,15 +44,24 @@ export class CampaignPromptsService {
     const prompt = await this.repo.findOne({ where: { id, companyId } });
     if (!prompt) throw new NotFoundException('Prompt não encontrado');
 
-    const inUse = await this.broadcastRepo.count({
+    const broadcastInUse = await this.broadcastRepo.count({
       where: {
         campaignPromptId: id,
         status: In([BroadcastStatus.DRAFT, BroadcastStatus.QUEUED, BroadcastStatus.SENDING]),
       },
     });
-    if (inUse > 0) {
+    if (broadcastInUse > 0) {
       throw new BadRequestException(
         'Este prompt está vinculado a um broadcast ativo. Remova-o dos broadcasts antes de excluir.',
+      );
+    }
+
+    const automationInUse = await this.automationRuleRepo.count({
+      where: { campaignPromptId: id, isActive: true },
+    });
+    if (automationInUse > 0) {
+      throw new BadRequestException(
+        'Este prompt está vinculado a uma automação ativa. Desative ou remova-o das automações antes de excluir.',
       );
     }
 

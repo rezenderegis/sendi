@@ -7,10 +7,11 @@ import { AutomationsService } from './automations.service';
 import { AutomationsCronService } from './automations-cron.service';
 import { AutomationsController } from './automations.controller';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AutomationRule, AutomationExecution]),
+    TypeOrmModule.forFeature([AutomationRule, AutomationExecution, CampaignPrompt]),
     ScheduleModule.forRoot(),
     WhatsappModule,
   ],

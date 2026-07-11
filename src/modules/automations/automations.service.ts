@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { AutomationRule, AutomationTriggerType } from './automation-rule.entity';
 import { AutomationExecution, AutomationExecutionStatus } from './automation-execution.entity';
 import { CreateAutomationRuleDto, UpdateAutomationRuleDto } from './dto/create-automation-rule.dto';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+
+const CAMPAIGN_CONTEXT_HOURS = 72;
 
 export interface UpcomingDispatch {
   date: string;
@@ -55,6 +58,8 @@ export class AutomationsService {
     private readonly ruleRepo: Repository<AutomationRule>,
     @InjectRepository(AutomationExecution)
     private readonly execRepo: Repository<AutomationExecution>,
+    @InjectRepository(CampaignPrompt)
+    private readonly campaignPromptRepo: Repository<CampaignPrompt>,
     private readonly whatsappService: WhatsappService,
   ) {}
 
@@ -73,9 +78,17 @@ export class AutomationsService {
   }
 
   async create(companyId: string, dto: CreateAutomationRuleDto): Promise<AutomationRule> {
+    let campaignPrompt: string | null = null;
+    if (dto.campaignPromptId) {
+      const prompt = await this.campaignPromptRepo.findOne({ where: { id: dto.campaignPromptId, companyId } });
+      if (!prompt) throw new BadRequestException('Prompt não encontrado');
+      campaignPrompt = prompt.content;
+    }
+
     const rule = this.ruleRepo.create({
       ...dto,
       companyId,
+      campaignPrompt,
       triggerOffsetDays: dto.triggerOffsetDays ?? 0,
       messageType: dto.messageType ?? 'text',
       templateLanguage: dto.templateLanguage ?? 'pt_BR',
@@ -85,7 +98,21 @@ export class AutomationsService {
 
   async update(id: string, companyId: string, dto: UpdateAutomationRuleDto): Promise<AutomationRule> {
     const rule = await this.findOne(id, companyId);
-    Object.assign(rule, dto);
+
+    const { campaignPromptId, ...rest } = dto;
+    if (campaignPromptId !== undefined) {
+      if (campaignPromptId) {
+        const prompt = await this.campaignPromptRepo.findOne({ where: { id: campaignPromptId, companyId } });
+        if (!prompt) throw new BadRequestException('Prompt não encontrado');
+        rule.campaignPromptId = campaignPromptId;
+        rule.campaignPrompt = prompt.content;
+      } else {
+        rule.campaignPromptId = null;
+        rule.campaignPrompt = null;
+      }
+    }
+
+    Object.assign(rule, rest);
     return this.ruleRepo.save(rule);
   }
 
@@ -300,6 +327,12 @@ export class AutomationsService {
     let error: string | null = null;
     let conversationId: string | null = null;
 
+    const campaignExpiresAt = rule.campaignPrompt ? (() => {
+      const d = new Date();
+      d.setHours(d.getHours() + CAMPAIGN_CONTEXT_HOURS);
+      return d;
+    })() : undefined;
+
     try {
       const result = await this.whatsappService.sendMessage(rule.companyId, {
         whatsappNumberId: rule.whatsappNumberId,
@@ -309,6 +342,8 @@ export class AutomationsService {
         templateName: isTemplate ? rule.templateName ?? undefined : undefined,
         templateLanguage: isTemplate ? (rule.templateLanguage ?? 'pt_BR') : undefined,
         templateVariables: resolvedTemplateVariables ?? undefined,
+        campaignPrompt: rule.campaignPrompt ?? undefined,
+        campaignExpiresAt,
       });
       conversationId = result?.conversationId ?? null;
     } catch (err) {
