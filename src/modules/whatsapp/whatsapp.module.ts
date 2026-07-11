@@ -10,13 +10,14 @@ import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
 import { Message } from '../conversations/message.entity';
+import { AutomationExecution } from '../automations/automation-execution.entity';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, BroadcastRecipient, Message]),
+    TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, BroadcastRecipient, Message, AutomationExecution]),
     BullModule.registerQueue({ name: 'whatsapp' }),
     ConversationsModule,
     ContactsModule,

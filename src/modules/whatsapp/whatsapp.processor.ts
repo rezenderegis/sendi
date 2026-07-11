@@ -10,6 +10,7 @@ import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { BroadcastRecipient, RecipientStatus } from '../broadcasts/broadcast-recipient.entity';
+import { AutomationExecution, AutomationExecutionStatus } from '../automations/automation-execution.entity';
 import { phoneAlternative } from '../../common/utils/phone.util';
 
 const HUMAN_WORDS = [
@@ -94,6 +95,8 @@ export class WhatsappProcessor {
     private readonly recipientRepo: Repository<BroadcastRecipient>,
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
+    @InjectRepository(AutomationExecution)
+    private readonly automationExecRepo: Repository<AutomationExecution>,
   ) {}
 
   @Process('inbound-message')
@@ -292,16 +295,25 @@ export class WhatsappProcessor {
       this.logger.log(`Status atualizado: ${status.id} -> ${status.status}`);
 
       if (messageStatus === MessageStatus.FAILED) {
+        const metaError = status.errors?.[0];
+        const errorMsg = metaError
+          ? `[${metaError.code}] ${metaError.error_data?.details ?? metaError.title ?? metaError.message ?? 'Falha na entrega'}`
+          : 'Falha na entrega (Meta)';
+
         // Marca recipient do broadcast como failed para aparecer na página de falhas
         const recipientId = updatedMessage?.metadata?.broadcastRecipientId;
         if (recipientId) {
-          const metaError = status.errors?.[0];
-          const errorMsg = metaError
-            ? `[${metaError.code}] ${metaError.title ?? metaError.message ?? 'Falha na entrega'}`
-            : 'Falha na entrega (Meta)';
           await this.recipientRepo.update(
             { id: recipientId },
             { status: RecipientStatus.FAILED, error: errorMsg },
+          );
+        }
+
+        // Atualiza automação execution com o erro de entrega do WhatsApp
+        if (updatedMessage?.conversationId) {
+          await this.automationExecRepo.update(
+            { conversationId: updatedMessage.conversationId, status: AutomationExecutionStatus.SENT },
+            { status: AutomationExecutionStatus.FAILED, error: errorMsg },
           );
         }
 
