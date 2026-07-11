@@ -131,10 +131,10 @@ export class AutomationsService {
   }
 
   /** Disparo manual de uma regra específica */
-  async runRuleNow(ruleId: string, companyId: string): Promise<{ triggered: number }> {
+  async runRuleNow(ruleId: string, companyId: string, force = false): Promise<{ triggered: number }> {
     const rule = await this.findOne(ruleId, companyId);
     const before = await this.execRepo.count({ where: { companyId } });
-    await this.runRule(rule);
+    await this.runRule(rule, force);
     const after = await this.execRepo.count({ where: { companyId } });
     return { triggered: after - before };
   }
@@ -231,14 +231,14 @@ export class AutomationsService {
     };
   }
 
-  private async runRule(rule: AutomationRule): Promise<void> {
+  private async runRule(rule: AutomationRule, force = false): Promise<void> {
     switch (rule.type) {
       case AutomationTriggerType.BIRTHDAY:
-        return this.runBirthday(rule);
+        return this.runBirthday(rule, force);
       case AutomationTriggerType.PAYMENT_OVERDUE:
-        return this.runPaymentOverdue(rule);
+        return this.runPaymentOverdue(rule, force);
       case AutomationTriggerType.REPURCHASE:
-        return this.runRepurchase(rule);
+        return this.runRepurchase(rule, force);
     }
   }
 
@@ -274,11 +274,12 @@ export class AutomationsService {
     contact: { id: string; phone: string; name: string },
     templateContext: Record<string, string>,
     dedupeKey: string,
+    force = false,
   ): Promise<void> {
     // Check opt-out first
     if (await this.isOptedOut(contact.id)) return;
 
-    if (await this.alreadySent(rule.id, contact.id, dedupeKey)) return;
+    if (!force && await this.alreadySent(rule.id, contact.id, dedupeKey)) return;
 
     const isTemplate = rule.messageType === 'template';
 
@@ -373,7 +374,7 @@ export class AutomationsService {
     );
   }
 
-  private async runBirthday(rule: AutomationRule): Promise<void> {
+  private async runBirthday(rule: AutomationRule, force = false): Promise<void> {
     // Dispara para contatos cujo mês+dia de aniversário = hoje + offset
     const targetDate = this.addDays(new Date(), rule.triggerOffsetDays);
     const targetMonth = targetDate.getMonth() + 1;
@@ -392,11 +393,11 @@ export class AutomationsService {
     for (const contact of contacts) {
       const firstName = contact.name?.split(' ')[0] || contact.name || '';
       const ctx = { nome: contact.name || '', primeiro_nome: firstName };
-      await this.sendAndRecord(rule, contact, ctx, `birthday-${year}`);
+      await this.sendAndRecord(rule, contact, ctx, `birthday-${year}`, force);
     }
   }
 
-  private async runPaymentOverdue(rule: AutomationRule): Promise<void> {
+  private async runPaymentOverdue(rule: AutomationRule, force = false): Promise<void> {
     // Dispara para vendas pendentes cujo vencimento = hoje - offset
     const targetDate = this.addDays(new Date(), -rule.triggerOffsetDays);
     const targetDateStr = this.toDateStr(targetDate);
@@ -425,11 +426,11 @@ export class AutomationsService {
         dias_atraso: String(row.dias_atraso || 0),
         data_compra: dataCompra,
       };
-      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, `overdue-${row.sale_id}`);
+      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, `overdue-${row.sale_id}`, force);
     }
   }
 
-  private async runRepurchase(rule: AutomationRule): Promise<void> {
+  private async runRepurchase(rule: AutomationRule, force = false): Promise<void> {
     // Dispara quando hoje = última compra + intervalo + offset
     const today = this.toDateStr(this.addDays(new Date(), -rule.triggerOffsetDays));
 
@@ -458,7 +459,7 @@ export class AutomationsService {
         : '';
       const ctx = { nome: row.name || '', primeiro_nome: firstName, produto: row.product_name || '', data_compra: dataCompra };
       const dedupeKey = `repurchase-${row.product_id}-${today}`;
-      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, dedupeKey);
+      await this.sendAndRecord(rule, { id: row.id, phone: row.phone, name: row.name }, ctx, dedupeKey, force);
     }
   }
 

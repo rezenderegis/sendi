@@ -119,8 +119,9 @@ export class AutomationsController {
   runRuleNow(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
+    @Query('force') force?: string,
   ) {
-    return this.automationsService.runRuleNow(id, companyId);
+    return this.automationsService.runRuleNow(id, companyId, force === 'true');
   }
 
   @Get(':id/audience')
