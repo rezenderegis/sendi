@@ -9,6 +9,7 @@ import { ContactsService } from '../contacts/contacts.service';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
 import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
+import { Broadcast } from '../broadcasts/broadcast.entity';
 import { BroadcastRecipient, RecipientStatus } from '../broadcasts/broadcast-recipient.entity';
 import { AutomationExecution, AutomationExecutionStatus } from '../automations/automation-execution.entity';
 import { phoneAlternative } from '../../common/utils/phone.util';
@@ -97,6 +98,8 @@ export class WhatsappProcessor {
     private readonly messageRepo: Repository<Message>,
     @InjectRepository(AutomationExecution)
     private readonly automationExecRepo: Repository<AutomationExecution>,
+    @InjectRepository(Broadcast)
+    private readonly broadcastRepo: Repository<Broadcast>,
   ) {}
 
   @Process('inbound-message')
@@ -179,6 +182,26 @@ export class WhatsappProcessor {
           recipient.respondedAt = new Date();
           recipient.responseSentiment = await this.aiService.classifySentiment(content) as any;
           await this.recipientRepo.save(recipient);
+        }
+
+        // Aplicar tag por intenção detectada
+        const broadcast = await this.broadcastRepo.findOne({
+          where: { id: conversation.campaignBroadcastId },
+        });
+        if (broadcast?.intentRules?.length) {
+          const intents = broadcast.intentRules.map((r) => r.intent);
+          const matchedIdx = await this.aiService.classifyIntent(content, intents);
+          if (matchedIdx >= 0) {
+            try {
+              await this.conversationsService.addTag(
+                conversation.id,
+                companyId,
+                broadcast.intentRules[matchedIdx].tagId,
+              );
+            } catch (e) {
+              this.logger.warn(`Falha ao aplicar tag de intenção: ${e.message}`);
+            }
+          }
         }
       }
 

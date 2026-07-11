@@ -81,6 +81,28 @@ export class AiService {
     return 'neutral';
   }
 
+  async classifyIntent(message: string, intents: string[]): Promise<number> {
+    try {
+      const list = intents.map((intent, i) => `${i}: ${intent}`).join('\n');
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'system',
+            content: `Analise a mensagem do cliente. Responda APENAS com o número da intenção que melhor corresponde, ou -1 se nenhuma corresponder claramente.\n\nIntenções:\n${list}`,
+          },
+          { role: 'user', content: message },
+        ],
+      });
+      const result = parseInt(response.choices[0]?.message?.content?.trim() ?? '-1', 10);
+      if (!isNaN(result) && result >= 0 && result < intents.length) return result;
+    } catch (err) {
+      this.logger.warn(`Falha ao classificar intenção: ${err.message}`);
+    }
+    return -1;
+  }
+
   async chat(
     contactName: string,
     history: { role: 'user' | 'assistant'; content: string }[],

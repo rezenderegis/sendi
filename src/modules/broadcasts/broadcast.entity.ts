@@ -84,6 +84,9 @@ export class Broadcast {
   @Column({ type: 'text', nullable: true })
   campaignPrompt: string | null;
 
+  @Column({ type: 'json', nullable: true })
+  intentRules: { intent: string; tagId: string }[] | null;
+
   @Column({ nullable: true })
   scheduledAt: Date | null;
 

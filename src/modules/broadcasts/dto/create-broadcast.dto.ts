@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class IntentRuleDto {
+  @IsString()
+  @MinLength(1)
+  intent: string;
+
+  @IsUUID()
+  tagId: string;
+}
 import { BroadcastMode, BroadcastType } from '../broadcast.entity';
 
 export class CreateBroadcastDto {
@@ -37,6 +47,13 @@ export class CreateBroadcastDto {
   @IsOptional()
   @IsString()
   campaignPrompt?: string;
+
+  @ApiPropertyOptional({ type: [IntentRuleDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IntentRuleDto)
+  intentRules?: IntentRuleDto[];
 
   @ApiPropertyOptional({ enum: BroadcastMode, default: BroadcastMode.STANDARD })
   @IsOptional()
@@ -80,6 +97,13 @@ export class UpdateBroadcastDto {
   @IsOptional()
   @IsString()
   campaignPrompt?: string;
+
+  @ApiPropertyOptional({ type: [IntentRuleDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IntentRuleDto)
+  intentRules?: IntentRuleDto[];
 }
 
 export class AddRecipientsDto {
