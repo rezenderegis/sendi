@@ -281,6 +281,10 @@ export class AutomationsService {
 
     if (!force && await this.alreadySent(rule.id, contact.id, dedupeKey)) return;
 
+    if (force) {
+      await this.execRepo.delete({ ruleId: rule.id, contactId: contact.id, dedupeKey });
+    }
+
     const isTemplate = rule.messageType === 'template';
 
     // Resolve message/vars before sending so we can store them regardless of success/failure
