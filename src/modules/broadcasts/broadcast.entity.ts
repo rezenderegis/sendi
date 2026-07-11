@@ -12,6 +12,7 @@ import { Company } from '../companies/company.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { BroadcastRecipient } from './broadcast-recipient.entity';
 import { Tag } from '../tags/tag.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 
 export enum BroadcastType {
   TEXT = 'text',
@@ -80,6 +81,13 @@ export class Broadcast {
 
   @Column({ type: 'int', default: 0 })
   failedCount: number;
+
+  @Column({ nullable: true })
+  campaignPromptId: string | null;
+
+  @ManyToOne(() => CampaignPrompt, { nullable: true, eager: false, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'campaignPromptId' })
+  campaignPromptRef: CampaignPrompt | null;
 
   @Column({ type: 'text', nullable: true })
   campaignPrompt: string | null;

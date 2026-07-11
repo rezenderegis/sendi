@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CampaignPrompt } from './campaign-prompt.entity';
 import { PromptVersion } from './prompt-version.entity';
+import { Broadcast, BroadcastStatus } from '../broadcasts/broadcast.entity';
 import { CreateCampaignPromptDto, UpdateCampaignPromptDto } from './dto/campaign-prompt.dto';
 
 const MAX_VERSIONS = 20;
@@ -14,6 +15,8 @@ export class CampaignPromptsService {
     private readonly repo: Repository<CampaignPrompt>,
     @InjectRepository(PromptVersion)
     private readonly versionRepo: Repository<PromptVersion>,
+    @InjectRepository(Broadcast)
+    private readonly broadcastRepo: Repository<Broadcast>,
   ) {}
 
   findAll(companyId: string): Promise<CampaignPrompt[]> {
@@ -37,6 +40,19 @@ export class CampaignPromptsService {
   async delete(id: string, companyId: string): Promise<void> {
     const prompt = await this.repo.findOne({ where: { id, companyId } });
     if (!prompt) throw new NotFoundException('Prompt não encontrado');
+
+    const inUse = await this.broadcastRepo.count({
+      where: {
+        campaignPromptId: id,
+        status: In([BroadcastStatus.DRAFT, BroadcastStatus.QUEUED, BroadcastStatus.SENDING]),
+      },
+    });
+    if (inUse > 0) {
+      throw new BadRequestException(
+        'Este prompt está vinculado a um broadcast ativo. Remova-o dos broadcasts antes de excluir.',
+      );
+    }
+
     await this.repo.remove(prompt);
   }
 

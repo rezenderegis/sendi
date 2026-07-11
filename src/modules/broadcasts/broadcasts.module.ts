@@ -11,10 +11,11 @@ import { BroadcastsController } from './broadcasts.controller';
 import { BroadcastProcessor } from './broadcast.processor';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { Tag } from '../tags/tag.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message, Tag]),
+    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message, Tag, CampaignPrompt]),
     BullModule.registerQueue({ name: 'broadcast' }),
     WhatsappModule,
   ],

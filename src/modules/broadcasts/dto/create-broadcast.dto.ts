@@ -43,10 +43,10 @@ export class CreateBroadcastDto {
   @IsString()
   templateLanguage?: string;
 
-  @ApiPropertyOptional({ example: 'Você é um assistente de vendas especializado em [produto].' })
+  @ApiPropertyOptional({ example: 'uuid-do-prompt' })
   @IsOptional()
-  @IsString()
-  campaignPrompt?: string;
+  @IsUUID()
+  campaignPromptId?: string;
 
   @ApiPropertyOptional({ type: [IntentRuleDto] })
   @IsOptional()
@@ -95,8 +95,8 @@ export class UpdateBroadcastDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  campaignPrompt?: string;
+  @IsUUID()
+  campaignPromptId?: string;
 
   @ApiPropertyOptional({ type: [IntentRuleDto] })
   @IsOptional()

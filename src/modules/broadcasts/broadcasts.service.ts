@@ -12,6 +12,7 @@ import { BroadcastRecipient, RecipientStatus } from './broadcast-recipient.entit
 import { Conversation } from '../conversations/conversation.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
 import { Tag } from '../tags/tag.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/create-broadcast.dto';
 import { BroadcastMode } from './broadcast.entity';
 import { parse } from 'csv-parse/sync';
@@ -42,6 +43,8 @@ export class BroadcastsService {
     private readonly messageRepo: Repository<Message>,
     @InjectRepository(Tag)
     private readonly tagRepo: Repository<Tag>,
+    @InjectRepository(CampaignPrompt)
+    private readonly campaignPromptRepo: Repository<CampaignPrompt>,
     @InjectQueue('broadcast')
     private readonly broadcastQueue: Queue,
   ) {}
@@ -53,10 +56,19 @@ export class BroadcastsService {
     if (dto.type === BroadcastType.TEMPLATE && !dto.templateName) {
       throw new BadRequestException('templateName é obrigatório para broadcasts de template');
     }
+
+    let campaignPrompt: string | null = null;
+    if (dto.campaignPromptId) {
+      const prompt = await this.campaignPromptRepo.findOne({ where: { id: dto.campaignPromptId, companyId } });
+      if (!prompt) throw new BadRequestException('Prompt não encontrado');
+      campaignPrompt = prompt.content;
+    }
+
     return this.broadcastRepo.save(
       this.broadcastRepo.create({
         ...dto,
         companyId,
+        campaignPrompt,
         templateLanguage: dto.templateLanguage || 'pt_BR',
       }),
     );
@@ -87,7 +99,21 @@ export class BroadcastsService {
     if (broadcast.status !== BroadcastStatus.DRAFT) {
       throw new BadRequestException('Só é possível editar broadcasts com status draft');
     }
-    Object.assign(broadcast, dto);
+
+    const { campaignPromptId, ...rest } = dto;
+    if (campaignPromptId !== undefined) {
+      if (campaignPromptId) {
+        const prompt = await this.campaignPromptRepo.findOne({ where: { id: campaignPromptId, companyId } });
+        if (!prompt) throw new BadRequestException('Prompt não encontrado');
+        broadcast.campaignPromptId = campaignPromptId;
+        broadcast.campaignPrompt = prompt.content;
+      } else {
+        broadcast.campaignPromptId = null;
+        broadcast.campaignPrompt = null;
+      }
+    }
+
+    Object.assign(broadcast, rest);
     return this.broadcastRepo.save(broadcast);
   }
 
