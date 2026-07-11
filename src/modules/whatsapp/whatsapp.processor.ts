@@ -189,8 +189,13 @@ export class WhatsappProcessor {
           where: { id: conversation.campaignBroadcastId },
         });
         if (broadcast?.intentRules?.length) {
+          const lastOutbound = await this.messageRepo.findOne({
+            where: { conversationId: conversation.id, direction: MessageDirection.OUTBOUND },
+            order: { createdAt: 'DESC' },
+          });
+          const questionContext = lastOutbound?.content ?? broadcast.message ?? undefined;
           const intents = broadcast.intentRules.map((r) => r.intent);
-          const matchedIdx = await this.aiService.classifyIntent(content, intents, broadcast.message ?? undefined);
+          const matchedIdx = await this.aiService.classifyIntent(content, intents, questionContext);
           if (matchedIdx >= 0) {
             try {
               await this.conversationsService.addTag(
