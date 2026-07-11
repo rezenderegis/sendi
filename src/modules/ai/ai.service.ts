@@ -81,16 +81,19 @@ export class AiService {
     return 'neutral';
   }
 
-  async classifyIntent(message: string, intents: string[]): Promise<number> {
+  async classifyIntent(message: string, intents: string[], broadcastMessage?: string): Promise<number> {
     try {
       const list = intents.map((intent, i) => `${i}: ${intent}`).join('\n');
+      const contextLine = broadcastMessage
+        ? `\n\nMensagem enviada pela empresa que originou esta resposta: "${broadcastMessage}"`
+        : '';
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',
         max_tokens: 10,
         messages: [
           {
             role: 'system',
-            content: `Analise a mensagem do cliente. Responda APENAS com o número da intenção que melhor corresponde, ou -1 se nenhuma corresponder claramente.\n\nIntenções:\n${list}`,
+            content: `Analise a resposta do cliente considerando o contexto da conversa. Responda APENAS com o número da intenção que melhor corresponde, ou -1 se nenhuma corresponder claramente.${contextLine}\n\nIntenções:\n${list}`,
           },
           { role: 'user', content: message },
         ],

@@ -190,7 +190,7 @@ export class WhatsappProcessor {
         });
         if (broadcast?.intentRules?.length) {
           const intents = broadcast.intentRules.map((r) => r.intent);
-          const matchedIdx = await this.aiService.classifyIntent(content, intents);
+          const matchedIdx = await this.aiService.classifyIntent(content, intents, broadcast.message ?? undefined);
           if (matchedIdx >= 0) {
             try {
               await this.conversationsService.addTag(
