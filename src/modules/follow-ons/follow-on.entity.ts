@@ -5,6 +5,7 @@ export enum FollowOnType {
   MEETING = 'meeting',
   CALL = 'call',
   MESSAGE = 'message',
+  MESSAGE_MANUAL = 'message_manual',
 }
 
 export enum FollowOnStatus {

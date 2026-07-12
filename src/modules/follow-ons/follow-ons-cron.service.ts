@@ -34,6 +34,7 @@ export class FollowOnsCronService {
           meeting: 'Reunião',
           call: 'Ligação',
           message: 'Mensagem enviada',
+          message_manual: 'Lembrete de mensagem',
         };
 
         if (fo.type === FollowOnType.MESSAGE) {
