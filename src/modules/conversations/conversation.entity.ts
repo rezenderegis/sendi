@@ -56,6 +56,9 @@ export class Conversation {
   lastMessageAt: Date;
 
   @Column({ nullable: true })
+  lastInboundAt: Date | null;
+
+  @Column({ nullable: true })
   assignedUserId: string;
 
   @ManyToOne(() => User, { nullable: true })

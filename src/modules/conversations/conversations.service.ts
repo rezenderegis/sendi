@@ -217,9 +217,9 @@ export class ConversationsService {
     });
     const saved = await this.messageRepository.save(message);
 
-    await this.conversationRepository.update(data.conversationId, {
-      lastMessageAt: new Date(),
-    });
+    const update: any = { lastMessageAt: new Date() };
+    if (data.direction === MessageDirection.INBOUND) update.lastInboundAt = new Date();
+    await this.conversationRepository.update(data.conversationId, update);
 
     return saved;
   }
