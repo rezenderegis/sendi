@@ -43,6 +43,7 @@ export class ConversationsService {
     limit = 20,
     tagId?: string,
     allowedNumberIds?: string[] | null,
+    waitingReply?: boolean,
   ): Promise<{ data: Conversation[]; total: number; page: number; limit: number }> {
     const qb = this.conversationRepository
       .createQueryBuilder('c')
@@ -61,6 +62,10 @@ export class ConversationsService {
 
     if (allowedNumberIds?.length) {
       qb.andWhere('c.whatsappNumberId IN (:...allowedNumberIds)', { allowedNumberIds });
+    }
+
+    if (waitingReply === true) {
+      qb.andWhere('c.waitingReply = true');
     }
 
     const [data, total] = await qb.getManyAndCount();
@@ -217,7 +222,10 @@ export class ConversationsService {
     });
     const saved = await this.messageRepository.save(message);
 
-    const update: any = { lastMessageAt: new Date() };
+    const update: any = {
+      lastMessageAt: new Date(),
+      waitingReply: data.direction === MessageDirection.INBOUND,
+    };
     if (data.direction === MessageDirection.INBOUND) update.lastInboundAt = new Date();
     await this.conversationRepository.update(data.conversationId, update);
 

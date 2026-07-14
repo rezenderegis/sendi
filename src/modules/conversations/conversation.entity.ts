@@ -88,6 +88,9 @@ export class Conversation {
   @Column({ nullable: true })
   campaignExpiresAt: Date | null;
 
+  @Column({ default: false })
+  waitingReply: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
