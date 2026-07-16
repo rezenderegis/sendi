@@ -21,6 +21,7 @@ import { SalesModule } from './modules/sales/sales.module';
 import { ContactProductSettingsModule } from './modules/contact-product-settings/contact-product-settings.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { FollowOnsModule } from './modules/follow-ons/follow-ons.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { FollowOnsModule } from './modules/follow-ons/follow-ons.module';
     ContactProductSettingsModule,
     AutomationsModule,
     FollowOnsModule,
+    LeadsModule,
   ],
   controllers: [HealthController],
 })
