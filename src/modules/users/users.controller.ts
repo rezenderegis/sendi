@@ -2,7 +2,10 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -46,6 +49,23 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     return this.usersService.update(id, companyId, dto);
+  }
+
+  @Patch(':id/revoke-sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revogar todas as sessões (tokens) já emitidas para o usuário' })
+  revokeSessions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') requestingUserId: string,
+    @CurrentUser('role') requestingRole: string,
+  ) {
+    const isSelf = id === requestingUserId;
+    const isManager = requestingRole === 'owner' || requestingRole === 'admin';
+    if (!isSelf && !isManager) {
+      throw new ForbiddenException('Sem permissão para revogar sessões de outro usuário');
+    }
+    return this.usersService.revokeSessions(id, companyId);
   }
 
   @Delete(':id')

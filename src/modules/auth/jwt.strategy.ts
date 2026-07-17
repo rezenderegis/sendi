@@ -18,13 +18,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; companyId: string }) {
+  async validate(payload: { sub: string; email: string; companyId: string; tokenVersion?: number }) {
     const user = await this.userRepository.findOne({
       where: { id: payload.sub, isActive: true },
     });
 
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado ou inativo');
+    }
+
+    if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+      throw new UnauthorizedException('Sessão revogada, faça login novamente');
     }
 
     return {

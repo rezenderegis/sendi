@@ -60,6 +60,11 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
+  async revokeSessions(id: string, companyId: string): Promise<void> {
+    await this.findById(id, companyId);
+    await this.userRepository.increment({ id }, 'tokenVersion', 1);
+  }
+
   async remove(id: string, companyId: string, requestingUserId: string): Promise<void> {
     const user = await this.findById(id, companyId);
 

@@ -53,6 +53,10 @@ export class User {
   @Column({ default: true })
   canSendBroadcast: boolean;
 
+  // Incrementado para invalidar todos os tokens já emitidos (ex: aparelho perdido)
+  @Column({ default: 0 })
+  tokenVersion: number;
+
   @BeforeInsert()
   async hashPassword() {
     if (this.password) {
