@@ -7,12 +7,14 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
+import { UpdateTagDto } from './dto/update-tag.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,6 +36,16 @@ export class TagsController {
   @ApiOperation({ summary: 'Criar tag' })
   create(@CurrentUser('companyId') companyId: string, @Body() dto: CreateTagDto) {
     return this.tagsService.create(companyId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Editar tag' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: UpdateTagDto,
+  ) {
+    return this.tagsService.update(id, companyId, dto);
   }
 
   @Delete(':id')

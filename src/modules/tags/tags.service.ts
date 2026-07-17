@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Tag } from './tag.entity';
 import { CreateTagDto } from './dto/create-tag.dto';
+import { UpdateTagDto } from './dto/update-tag.dto';
 
 @Injectable()
 export class TagsService {
@@ -27,6 +28,19 @@ export class TagsService {
     }
 
     const tag = this.tagRepository.create({ ...dto, companyId });
+    return this.tagRepository.save(tag);
+  }
+
+  async update(id: string, companyId: string, dto: UpdateTagDto): Promise<Tag> {
+    const tag = await this.tagRepository.findOne({ where: { id, companyId } });
+    if (!tag) throw new NotFoundException('Tag não encontrada');
+
+    if (dto.name && dto.name !== tag.name) {
+      const existing = await this.tagRepository.findOne({ where: { companyId, name: dto.name } });
+      if (existing) throw new ConflictException('Tag com este nome já existe para esta empresa');
+    }
+
+    Object.assign(tag, dto);
     return this.tagRepository.save(tag);
   }
 
