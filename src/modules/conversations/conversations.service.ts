@@ -52,6 +52,7 @@ export class ConversationsService {
       .leftJoinAndSelect('c.whatsappNumber', 'whatsappNumber')
       .leftJoinAndSelect('c.assignedUser', 'assignedUser')
       .leftJoinAndSelect('c.tags', 'tags')
+      .leftJoinAndSelect('c.kanbanColumn', 'kanbanColumn')
       .where('c.companyId = :companyId', { companyId })
       .orderBy('c.lastMessageAt', 'DESC')
       .skip((page - 1) * limit)
@@ -82,7 +83,7 @@ export class ConversationsService {
   async findById(id: string, companyId: string): Promise<Conversation> {
     const conversation = await this.conversationRepository.findOne({
       where: { id, companyId },
-      relations: ['contact', 'whatsappNumber', 'assignedUser', 'tags'],
+      relations: ['contact', 'whatsappNumber', 'assignedUser', 'tags', 'kanbanColumn'],
     });
     if (!conversation) {
       throw new NotFoundException('Conversa não encontrada');
@@ -111,14 +112,14 @@ export class ConversationsService {
   async updateStatus(
     id: string,
     companyId: string,
-    status: ConversationStatus,
+    status?: ConversationStatus,
     assignedUserId?: string,
+    kanbanColumnId?: string | null,
   ): Promise<Conversation> {
     const conversation = await this.findById(id, companyId);
-    conversation.status = status;
-    if (assignedUserId !== undefined) {
-      conversation.assignedUserId = assignedUserId;
-    }
+    if (status !== undefined) conversation.status = status;
+    if (assignedUserId !== undefined) conversation.assignedUserId = assignedUserId;
+    if (kanbanColumnId !== undefined) conversation.kanbanColumnId = kanbanColumnId;
     return this.conversationRepository.save(conversation);
   }
 

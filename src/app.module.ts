@@ -22,6 +22,7 @@ import { ContactProductSettingsModule } from './modules/contact-product-settings
 import { AutomationsModule } from './modules/automations/automations.module';
 import { FollowOnsModule } from './modules/follow-ons/follow-ons.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { KanbanColumnsModule } from './modules/kanban-columns/kanban-columns.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     AutomationsModule,
     FollowOnsModule,
     LeadsModule,
+    KanbanColumnsModule,
   ],
   controllers: [HealthController],
 })
