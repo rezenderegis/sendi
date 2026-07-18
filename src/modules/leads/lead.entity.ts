@@ -5,6 +5,11 @@ export enum LeadSource {
   WHATSAPP = 'whatsapp',
 }
 
+export enum LeadBrand {
+  SENDE = 'sende',
+  GLOBALSIX = 'globalsix',
+}
+
 @Entity('leads')
 export class Lead {
   @PrimaryGeneratedColumn('uuid')
@@ -21,6 +26,9 @@ export class Lead {
 
   @Column({ type: 'enum', enum: LeadSource, default: LeadSource.FORM })
   source: LeadSource;
+
+  @Column({ type: 'enum', enum: LeadBrand, default: LeadBrand.SENDE })
+  brand: LeadBrand;
 
   @CreateDateColumn()
   createdAt: Date;
