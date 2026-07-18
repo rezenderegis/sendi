@@ -37,3 +37,38 @@ export class CreateFollowOnDto {
   @IsString({ each: true })
   templateVariables?: string[];
 }
+
+export class UpdateFollowOnDto {
+  @IsOptional()
+  @IsEnum(FollowOnType)
+  type?: FollowOnType;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsUUID()
+  assignedUserId?: string;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @IsOptional()
+  @IsString()
+  templateName?: string;
+
+  @IsOptional()
+  @IsString()
+  templateLanguage?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  templateVariables?: string[];
+}

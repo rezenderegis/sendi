@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, Not, In } from 'typeorm';
 import { FollowOn, FollowOnStatus, FollowOnType } from './follow-on.entity';
 import { AppNotification } from './notification.entity';
-import { CreateFollowOnDto } from './dto/follow-on.dto';
+import { CreateFollowOnDto, UpdateFollowOnDto } from './dto/follow-on.dto';
 
 @Injectable()
 export class FollowOnsService {
@@ -46,20 +46,36 @@ export class FollowOnsService {
     });
   }
 
-  async cancel(id: string, companyId: string): Promise<FollowOn> {
+  async complete(id: string, companyId: string): Promise<FollowOn> {
     const followOn = await this.repo.findOne({ where: { id, companyId } });
     if (!followOn) throw new NotFoundException('Follow-on não encontrado');
-    if (followOn.status !== FollowOnStatus.PENDING) {
-      throw new BadRequestException('Só é possível cancelar follow-ons pendentes');
-    }
-    followOn.status = FollowOnStatus.CANCELLED;
+    followOn.status = FollowOnStatus.DONE;
+    followOn.sentAt = new Date();
+    return this.repo.save(followOn);
+  }
+
+  async reopen(id: string, companyId: string): Promise<FollowOn> {
+    const followOn = await this.repo.findOne({ where: { id, companyId } });
+    if (!followOn) throw new NotFoundException('Follow-on não encontrado');
+    followOn.status = FollowOnStatus.PENDING;
+    followOn.sentAt = null;
+    return this.repo.save(followOn);
+  }
+
+  async update(id: string, companyId: string, dto: UpdateFollowOnDto): Promise<FollowOn> {
+    const followOn = await this.repo.findOne({ where: { id, companyId } });
+    if (!followOn) throw new NotFoundException('Follow-on não encontrado');
+    Object.assign(followOn, {
+      ...dto,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : followOn.scheduledAt,
+    });
     return this.repo.save(followOn);
   }
 
   async remove(id: string, companyId: string): Promise<void> {
     const followOn = await this.repo.findOne({ where: { id, companyId } });
     if (!followOn) throw new NotFoundException('Follow-on não encontrado');
-    await this.repo.remove(followOn);
+    await this.repo.softDelete(id);
   }
 
   async findPendingDue(): Promise<FollowOn[]> {

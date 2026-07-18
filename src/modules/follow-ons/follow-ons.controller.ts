@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FollowOnsService } from './follow-ons.service';
-import { CreateFollowOnDto } from './dto/follow-on.dto';
+import { CreateFollowOnDto, UpdateFollowOnDto } from './dto/follow-on.dto';
 import { FollowOnStatus } from './follow-on.entity';
 
 @ApiTags('Follow-ons')
@@ -40,12 +40,29 @@ export class FollowOnsController {
     return this.service.findByConversation(conversationId, companyId);
   }
 
-  @Patch(':id/cancel')
-  cancel(
+  @Patch(':id/complete')
+  complete(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
   ) {
-    return this.service.cancel(id, companyId);
+    return this.service.complete(id, companyId);
+  }
+
+  @Patch(':id/reopen')
+  reopen(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.reopen(id, companyId);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: UpdateFollowOnDto,
+  ) {
+    return this.service.update(id, companyId, dto);
   }
 
   @Delete(':id')
