@@ -17,6 +17,8 @@ import { CreateBroadcastDto, AddRecipientsDto, UpdateBroadcastDto } from './dto/
 import { BroadcastMode } from './broadcast.entity';
 import { parse } from 'csv-parse/sync';
 import { normalizePhone } from '../../common/utils/phone.util';
+import { UsageService } from '../billing/usage.service';
+import { WhatsappTemplate } from '../whatsapp/whatsapp-template.entity';
 
 export interface FailureRow {
   id: string;
@@ -47,6 +49,9 @@ export class BroadcastsService {
     private readonly campaignPromptRepo: Repository<CampaignPrompt>,
     @InjectQueue('broadcast')
     private readonly broadcastQueue: Queue,
+    private readonly usageService: UsageService,
+    @InjectRepository(WhatsappTemplate)
+    private readonly whatsappTemplateRepo: Repository<WhatsappTemplate>,
   ) {}
 
   async create(companyId: string, dto: CreateBroadcastDto): Promise<Broadcast> {
@@ -192,6 +197,15 @@ export class BroadcastsService {
     const recipients = await this.recipientRepo.find({
       where: { broadcastId: id, status: RecipientStatus.PENDING },
     });
+
+    const isTemplate = broadcast.type === BroadcastType.TEMPLATE;
+    const templateCategory = isTemplate && broadcast.templateName
+      ? (await this.whatsappTemplateRepo.findOne({
+          where: { whatsappNumberId: broadcast.whatsappNumberId, name: broadcast.templateName },
+        }))?.category ?? null
+      : null;
+
+    await this.usageService.assertBudgetForBroadcast(companyId, recipients.length, { isTemplate, category: templateCategory });
 
     for (let i = 0; i < recipients.length; i++) {
       await this.broadcastQueue.add(

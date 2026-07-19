@@ -32,6 +32,9 @@ export class Company {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ type: 'int', default: 0 })
+  balanceCents: number;
+
   @OneToMany(() => User, (user) => user.company)
   users: User[];
 

@@ -1,5 +1,11 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength, ValidateIf } from 'class-validator';
+import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export enum TemplateCategory {
+  MARKETING = 'MARKETING',
+  UTILITY = 'UTILITY',
+  AUTHENTICATION = 'AUTHENTICATION',
+}
 
 export class SendMessageDto {
   @ApiProperty({ example: '5561984402868' })
@@ -88,4 +94,39 @@ export class ConnectNumberDto {
   @IsString()
   @IsNotEmpty()
   displayName: string;
+}
+
+export class CreateTemplateDto {
+  @ApiProperty({ example: 'lembrete_reuniao', description: 'Somente minúsculas, números e underscore' })
+  @IsString()
+  @Matches(/^[a-z0-9_]+$/, { message: 'name deve conter apenas letras minúsculas, números e underscore' })
+  @MaxLength(512)
+  name: string;
+
+  @ApiProperty({ example: 'pt_BR' })
+  @IsString()
+  @IsNotEmpty()
+  language: string;
+
+  @ApiProperty({ enum: TemplateCategory })
+  @IsEnum(TemplateCategory)
+  category: TemplateCategory;
+
+  @ApiProperty({ example: 'Olá {{1}}, passando pra lembrar da nossa reunião amanhã às {{2}}.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(1024)
+  bodyText: string;
+
+  @ApiPropertyOptional({ example: 'Responda essa mensagem se precisar remarcar' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  footerText?: string;
+
+  @ApiPropertyOptional({ example: 'Lembrete de reunião' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  headerText?: string;
 }

@@ -72,6 +72,12 @@ export class Message {
   aiPromptSource: string | null;
 
   @Column({ nullable: true })
+  whatsappNumberId: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  costCents: number;
+
+  @Column({ nullable: true })
   sentAt: Date;
 
   @Column({ nullable: true })

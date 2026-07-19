@@ -50,6 +50,12 @@ export class WhatsappNumber {
   @Column({ type: 'int', default: 20 })
   botHistoryLimit: number;
 
+  @Column({ type: 'int', nullable: true })
+  dailySpendLimitCents: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  monthlySpendLimitCents: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

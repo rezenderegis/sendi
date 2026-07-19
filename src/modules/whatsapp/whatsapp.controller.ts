@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
-import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
+import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -98,6 +98,18 @@ export class WhatsappController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.whatsappService.listTemplates(id, companyId);
+  }
+
+  @Post('numbers/:id/templates')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.OWNER)
+  @ApiOperation({ summary: 'Criar e submeter template para aprovação da Meta (somente owner)' })
+  createTemplate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: CreateTemplateDto,
+  ) {
+    return this.whatsappService.createTemplate(id, companyId, dto);
   }
 
   @Post('messages/send')

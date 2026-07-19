@@ -40,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       allowedNumberIds: user.allowedNumberIds,
       canConfigureBot: user.canConfigureBot,
       canSendBroadcast: user.canSendBroadcast,
+      isPlatformAdmin: user.isPlatformAdmin,
     };
   }
 }

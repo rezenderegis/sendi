@@ -222,6 +222,8 @@ export class ConversationsService {
     status?: MessageStatus;
     metadata?: Record<string, any>;
     aiPromptSource?: string;
+    whatsappNumberId?: string;
+    costCents?: number;
   }): Promise<Message> {
     const message = this.messageRepository.create({
       ...data,

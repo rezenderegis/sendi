@@ -53,6 +53,9 @@ export class User {
   @Column({ default: true })
   canSendBroadcast: boolean;
 
+  @Column({ default: false })
+  isPlatformAdmin: boolean;
+
   // Incrementado para invalidar todos os tokens já emitidos (ex: aparelho perdido)
   @Column({ default: 0 })
   tokenVersion: number;

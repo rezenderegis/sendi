@@ -23,6 +23,8 @@ import { AutomationsModule } from './modules/automations/automations.module';
 import { FollowOnsModule } from './modules/follow-ons/follow-ons.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { KanbanColumnsModule } from './modules/kanban-columns/kanban-columns.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -93,6 +95,8 @@ import { KanbanColumnsModule } from './modules/kanban-columns/kanban-columns.mod
     FollowOnsModule,
     LeadsModule,
     KanbanColumnsModule,
+    BillingModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

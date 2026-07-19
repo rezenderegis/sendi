@@ -10,13 +10,14 @@ import axios from 'axios';
 import * as crypto from 'crypto';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
-import { ConnectNumberDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
+import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
 import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { UsageService } from '../billing/usage.service';
 
 @Injectable()
 export class WhatsappService {
@@ -31,6 +32,7 @@ export class WhatsappService {
     private readonly conversationsService: ConversationsService,
     private readonly contactsService: ContactsService,
     @InjectQueue('whatsapp') private readonly whatsappQueue: Queue,
+    private readonly usageService: UsageService,
   ) {}
 
   private encrypt(text: string): string {
@@ -118,11 +120,21 @@ export class WhatsappService {
 
   async sendMessage(companyId: string, dto: SendMessageDto): Promise<any> {
     const whatsappNumber = await this.findById(dto.whatsappNumberId, companyId);
+    const isTemplate = dto.type === 'template';
+
+    const templateCategory = isTemplate
+      ? (await this.whatsappTemplateRepository.findOne({
+          where: { whatsappNumberId: whatsappNumber.id, name: dto.templateName },
+        }))?.category ?? null
+      : null;
+
+    const costCents = await this.usageService.costForMessage({ isBot: false, isTemplate, category: templateCategory });
+    await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
+
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const to = dto.to.replace(/\D/g, '');
-    const isTemplate = dto.type === 'template';
 
     const body: any = {
       messaging_product: 'whatsapp',
@@ -272,7 +284,10 @@ export class WhatsappService {
       whatsappMessageId,
       status: MessageStatus.SENT,
       metadata: dto.broadcastRecipientId ? { broadcastRecipientId: dto.broadcastRecipientId } : undefined,
+      whatsappNumberId: whatsappNumber.id,
+      costCents,
     });
+    await this.usageService.recordSend(companyId, costCents);
 
     if (dto.campaignPrompt && dto.campaignExpiresAt) {
       await this.conversationsService.setCampaignContext(
@@ -326,6 +341,9 @@ export class WhatsappService {
     aiPromptSource?: string,
     metadata?: Record<string, any>,
   ): Promise<void> {
+    const costCents = await this.usageService.costForMessage({ isBot: true });
+    await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
+
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
@@ -358,7 +376,10 @@ export class WhatsappService {
       status: MessageStatus.SENT,
       aiPromptSource: aiPromptSource ?? null,
       metadata: metadata ?? undefined,
+      whatsappNumberId: whatsappNumber.id,
+      costCents,
     });
+    await this.usageService.recordSend(companyId, costCents);
   }
 
   async syncTemplates(id: string, companyId: string): Promise<{ synced: number }> {
@@ -419,12 +440,115 @@ export class WhatsappService {
     return { synced: templates.length };
   }
 
+  async createTemplate(id: string, companyId: string, dto: CreateTemplateDto): Promise<WhatsappTemplate> {
+    const whatsappNumber = await this.findById(id, companyId);
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const components: any[] = [];
+    if (dto.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: dto.headerText });
+    components.push({ type: 'BODY', text: dto.bodyText });
+    if (dto.footerText) components.push({ type: 'FOOTER', text: dto.footerText });
+
+    let response: any;
+    try {
+      response = await axios.post(
+        `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
+        {
+          name: dto.name,
+          language: dto.language,
+          category: dto.category,
+          components,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Meta API error creating template ${dto.name} for wabaId=${whatsappNumber.wabaId}: ${JSON.stringify(err.response?.data ?? err.message)}`,
+      );
+      throw err;
+    }
+
+    const bodyVars = new Set(dto.bodyText.match(/\{\{\d+\}\}/g) ?? []);
+    const headerVars = new Set((dto.headerText ?? '').match(/\{\{\d+\}\}/g) ?? []);
+
+    return this.whatsappTemplateRepository.save(
+      this.whatsappTemplateRepository.create({
+        companyId,
+        whatsappNumberId: whatsappNumber.id,
+        metaId: String(response.data?.id),
+        name: dto.name,
+        language: dto.language,
+        status: response.data?.status ?? 'PENDING',
+        category: response.data?.category ?? dto.category,
+        bodyText: dto.bodyText,
+        variablesCount: bodyVars.size + headerVars.size,
+        syncedAt: new Date(),
+      }),
+    );
+  }
+
   async listTemplates(id: string, companyId: string): Promise<WhatsappTemplate[]> {
     await this.findById(id, companyId);
     return this.whatsappTemplateRepository.find({
       where: { whatsappNumberId: id, companyId },
       order: { name: 'ASC' },
     });
+  }
+
+  async getConversationAnalytics(
+    id: string,
+    companyId: string,
+    since: Date,
+    until: Date,
+  ): Promise<{ byCategory: { category: string; costCents: number }[]; byCountry: { country: string; costCents: number }[]; totalCostCents: number }> {
+    const whatsappNumber = await this.findById(id, companyId);
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const startUnix = Math.floor(since.getTime() / 1000);
+    const endUnix = Math.floor(until.getTime() / 1000);
+
+    const fields = `conversation_analytics.start(${startUnix}).end(${endUnix}).granularity(DAILY).phone_numbers(["${whatsappNumber.phoneNumberId}"]).dimensions(["conversation_category","country"])`;
+
+    let response: any;
+    try {
+      response = await axios.get(`${apiUrl}/${whatsappNumber.wabaId}`, {
+        params: { fields },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (err: any) {
+      this.logger.error(
+        `Meta API error fetching conversation_analytics: ${JSON.stringify(err.response?.data ?? err.message)}`,
+      );
+      throw err;
+    }
+
+    const dataPoints: any[] = response.data?.conversation_analytics?.data?.[0]?.data_points ?? [];
+
+    const byCategoryMap = new Map<string, number>();
+    const byCountryMap = new Map<string, number>();
+    let totalCostCents = 0;
+
+    for (const dp of dataPoints) {
+      const costCents = Math.round((dp.cost ?? 0) * 100);
+      const category = dp.conversation_category ?? 'UNKNOWN';
+      const country = dp.country ?? 'UNKNOWN';
+      byCategoryMap.set(category, (byCategoryMap.get(category) ?? 0) + costCents);
+      byCountryMap.set(country, (byCountryMap.get(country) ?? 0) + costCents);
+      totalCostCents += costCents;
+    }
+
+    return {
+      byCategory: Array.from(byCategoryMap.entries()).map(([category, costCents]) => ({ category, costCents })),
+      byCountry: Array.from(byCountryMap.entries()).map(([country, costCents]) => ({ country, costCents })),
+      totalCostCents,
+    };
   }
 
   async processInboundMessage(payload: any): Promise<void> {

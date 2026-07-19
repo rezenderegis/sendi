@@ -12,12 +12,15 @@ import { BroadcastProcessor } from './broadcast.processor';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { Tag } from '../tags/tag.entity';
 import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
+import { BillingModule } from '../billing/billing.module';
+import { WhatsappTemplate } from '../whatsapp/whatsapp-template.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message, Tag, CampaignPrompt]),
+    TypeOrmModule.forFeature([Broadcast, BroadcastRecipient, Conversation, ConversationEvent, Message, Tag, CampaignPrompt, WhatsappTemplate]),
     BullModule.registerQueue({ name: 'broadcast' }),
     WhatsappModule,
+    BillingModule,
   ],
   controllers: [BroadcastsController],
   providers: [BroadcastsService, BroadcastProcessor],

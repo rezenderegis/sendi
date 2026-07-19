@@ -15,6 +15,7 @@ import { AutomationExecution } from '../automations/automation-execution.entity'
 import { ConversationsModule } from '../conversations/conversations.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AiModule } from '../ai/ai.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AiModule } from '../ai/ai.module';
     ConversationsModule,
     ContactsModule,
     AiModule,
+    BillingModule,
   ],
   controllers: [WhatsappController, WebhookController],
   providers: [WhatsappService, WebhookService, WhatsappProcessor],
