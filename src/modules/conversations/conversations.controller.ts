@@ -91,19 +91,19 @@ export class ConversationsController {
   }
 
   @Get(':id/messages')
-  @ApiOperation({ summary: 'Mensagens da conversa (paginado)' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiOperation({ summary: 'Mensagens da conversa — mais recentes primeiro, paginado por cursor (before)' })
+  @ApiQuery({ name: 'before', required: false, type: String, description: 'ISO date — retorna mensagens anteriores a esse horário' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   findMessages(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('companyId') companyId: string,
-    @Query('page') page = '1',
+    @Query('before') before?: string,
     @Query('limit') limit = '50',
   ) {
     return this.conversationsService.findMessages(
       id,
       companyId,
-      parseInt(page, 10),
+      before ? new Date(before) : undefined,
       parseInt(limit, 10),
     );
   }

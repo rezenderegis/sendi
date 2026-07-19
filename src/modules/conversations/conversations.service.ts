@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { Conversation, ConversationStatus } from './conversation.entity';
 import { ConversationEvent, ConversationEventType } from './conversation-event.entity';
 import { Message, MessageDirection, MessageStatus, MessageType } from './message.entity';
@@ -94,19 +94,22 @@ export class ConversationsService {
   async findMessages(
     conversationId: string,
     companyId: string,
-    page = 1,
+    before?: Date,
     limit = 50,
   ) {
     await this.findById(conversationId, companyId);
 
-    const [data, total] = await this.messageRepository.findAndCount({
-      where: { conversationId, companyId },
-      order: { createdAt: 'ASC' },
-      skip: (page - 1) * limit,
+    const where: any = { conversationId, companyId };
+    if (before) where.createdAt = LessThan(before);
+
+    const data = await this.messageRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
       take: limit,
     });
+    data.reverse();
 
-    return { data, total, page, limit };
+    return { data, hasMore: data.length === limit };
   }
 
   async updateStatus(
