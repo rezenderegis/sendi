@@ -129,4 +129,14 @@ export class CreateTemplateDto {
   @IsString()
   @MaxLength(60)
   headerText?: string;
+
+  @ApiPropertyOptional({ example: ['João'], description: 'Valores de exemplo para cada {{n}} do corpo, na ordem — obrigatório se o corpo tiver variáveis' })
+  @IsOptional()
+  @IsString({ each: true })
+  bodyExamples?: string[];
+
+  @ApiPropertyOptional({ example: 'João', description: 'Valor de exemplo para a variável do cabeçalho, se houver' })
+  @IsOptional()
+  @IsString()
+  headerExample?: string;
 }

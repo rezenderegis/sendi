@@ -449,13 +449,35 @@ export class WhatsappService {
       }
     }
 
+    const bodyVarCount = new Set(dto.bodyText.match(/\{\{\d+\}\}/g) ?? []).size;
+    if (bodyVarCount > 0 && (dto.bodyExamples?.length ?? 0) < bodyVarCount) {
+      throw new BadRequestException(
+        `O corpo tem ${bodyVarCount} variável(is) — a Meta exige um valor de exemplo pra cada uma antes de submeter o template`,
+      );
+    }
+    const headerHasVar = /\{\{\d+\}\}/.test(dto.headerText ?? '');
+    if (headerHasVar && !dto.headerExample) {
+      throw new BadRequestException('O cabeçalho tem uma variável — a Meta exige um valor de exemplo pra ela');
+    }
+
     const whatsappNumber = await this.findById(id, companyId);
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const components: any[] = [];
-    if (dto.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: dto.headerText });
-    components.push({ type: 'BODY', text: dto.bodyText });
+    if (dto.headerText) {
+      components.push({
+        type: 'HEADER',
+        format: 'TEXT',
+        text: dto.headerText,
+        ...(headerHasVar ? { example: { header_text: [dto.headerExample] } } : {}),
+      });
+    }
+    components.push({
+      type: 'BODY',
+      text: dto.bodyText,
+      ...(bodyVarCount > 0 ? { example: { body_text: [dto.bodyExamples!.slice(0, bodyVarCount)] } } : {}),
+    });
     if (dto.footerText) components.push({ type: 'FOOTER', text: dto.footerText });
 
     let response: any;
