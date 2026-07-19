@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -442,6 +443,12 @@ export class WhatsappService {
   }
 
   async createTemplate(id: string, companyId: string, dto: CreateTemplateDto): Promise<WhatsappTemplate> {
+    for (const [field, text] of [['bodyText', dto.bodyText], ['headerText', dto.headerText], ['footerText', dto.footerText]] as const) {
+      if (text?.includes('{{}}')) {
+        throw new BadRequestException(`Variável vazia encontrada em "${field}" — use {{1}}, {{2}}, etc. em vez de {{}}`);
+      }
+    }
+
     const whatsappNumber = await this.findById(id, companyId);
     const accessToken = this.decrypt(whatsappNumber.accessToken);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
