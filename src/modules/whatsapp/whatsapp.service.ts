@@ -392,7 +392,7 @@ export class WhatsappService {
       response = await axios.get(
         `${apiUrl}/${whatsappNumber.wabaId}/message_templates`,
         {
-          params: { fields: 'id,name,language,status,category,components', limit: 100 },
+          params: { fields: 'id,name,language,status,category,rejected_reason,components', limit: 100 },
           headers: { Authorization: `Bearer ${accessToken}` },
         },
       );
@@ -430,6 +430,7 @@ export class WhatsappService {
           language: tpl.language,
           status: tpl.status,
           category: tpl.category || null,
+          rejectedReason: tpl.rejected_reason && tpl.rejected_reason !== 'NONE' ? tpl.rejected_reason : null,
           bodyText,
           variablesCount,
           syncedAt: new Date(),

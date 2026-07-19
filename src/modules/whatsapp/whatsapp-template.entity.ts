@@ -41,6 +41,9 @@ export class WhatsappTemplate {
   @Column({ nullable: true })
   category: string | null;
 
+  @Column({ nullable: true })
+  rejectedReason: string | null;
+
   @Column({ type: 'text', nullable: true })
   bodyText: string | null;
 
