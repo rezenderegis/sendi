@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Contact } from './contact.entity';
 import { CreateContactDto, UpdateContactDto } from './dto/create-contact.dto';
 import { Tag } from '../tags/tag.entity';
+import { Conversation } from '../conversations/conversation.entity';
 
 const TAG_COLUMNS = ['tag', 'tags', 'etiqueta', 'etiquetas'];
 import { parse } from 'csv-parse/sync';
@@ -56,13 +57,15 @@ export class ContactsService {
     private readonly contactRepository: Repository<Contact>,
     @InjectRepository(Tag)
     private readonly tagRepository: Repository<Tag>,
+    @InjectRepository(Conversation)
+    private readonly conversationRepository: Repository<Conversation>,
   ) {}
 
   async findAll(
     companyId: string,
     broadcastId?: string,
     broadcastResponseFilter?: string,
-  ): Promise<Contact[]> {
+  ): Promise<(Contact & { conversationId: string | null })[]> {
     const qb = this.contactRepository
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.tags', 'tags')
@@ -84,7 +87,26 @@ export class ContactsService {
       );
     }
 
-    return qb.getMany();
+    const contacts = await qb.getMany();
+    if (contacts.length === 0) return [];
+
+    // Conversa mais recente de cada contato (um contato pode ter mais de uma
+    // se já foi atendido por números WhatsApp diferentes).
+    const conversations = await this.conversationRepository
+      .createQueryBuilder('conv')
+      .select(['conv.id', 'conv.contactId'])
+      .where('conv.contactId IN (:...ids)', { ids: contacts.map((c) => c.id) })
+      .orderBy('conv.lastMessageAt', 'DESC')
+      .getMany();
+
+    const conversationByContact = new Map<string, string>();
+    for (const conv of conversations) {
+      if (!conversationByContact.has(conv.contactId)) {
+        conversationByContact.set(conv.contactId, conv.id);
+      }
+    }
+
+    return contacts.map((c) => Object.assign(c, { conversationId: conversationByContact.get(c.id) ?? null }));
   }
 
   async findById(id: string, companyId: string): Promise<Contact> {
