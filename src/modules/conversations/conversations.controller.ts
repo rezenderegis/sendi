@@ -59,6 +59,7 @@ export class ConversationsController {
   @ApiQuery({ name: 'tagId', required: false, type: String, description: 'Filtrar por tag' })
   @ApiQuery({ name: 'waitingReply', required: false, type: Boolean, description: 'Somente conversas aguardando resposta da empresa' })
   @ApiQuery({ name: 'waitingCustomerReply', required: false, type: Boolean, description: 'Somente conversas aguardando resposta do cliente' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Busca por nome ou telefone do contato, em toda a base' })
   findAll(
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('role') role: string,
@@ -68,6 +69,7 @@ export class ConversationsController {
     @Query('tagId') tagId?: string,
     @Query('waitingReply') waitingReply?: string,
     @Query('waitingCustomerReply') waitingCustomerReply?: string,
+    @Query('search') search?: string,
   ) {
     const numberFilter = role === 'owner' ? null : allowedNumberIds;
     return this.conversationsService.findAll(
@@ -78,6 +80,7 @@ export class ConversationsController {
       numberFilter,
       waitingReply === 'true' ? true : undefined,
       waitingCustomerReply === 'true' ? true : undefined,
+      search,
     );
   }
 

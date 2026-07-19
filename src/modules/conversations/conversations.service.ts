@@ -45,6 +45,7 @@ export class ConversationsService {
     allowedNumberIds?: string[] | null,
     waitingReply?: boolean,
     waitingCustomerReply?: boolean,
+    search?: string,
   ): Promise<{ data: Conversation[]; total: number; page: number; limit: number }> {
     const qb = this.conversationRepository
       .createQueryBuilder('c')
@@ -74,6 +75,10 @@ export class ConversationsService {
       qb.andWhere('c.waitingReply = false')
         .andWhere('c.lastMessageAt IS NOT NULL')
         .andWhere('c.status = :open', { open: 'open' });
+    }
+
+    if (search) {
+      qb.andWhere('(contact.name ILIKE :search OR contact.phone ILIKE :search)', { search: `%${search}%` });
     }
 
     const [data, total] = await qb.getManyAndCount();
