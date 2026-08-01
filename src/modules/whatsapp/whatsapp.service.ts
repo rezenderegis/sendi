@@ -3,6 +3,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,10 +14,11 @@ import * as crypto from 'crypto';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
+import { MediaService } from './media.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
-import { MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
+import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { UsageService } from '../billing/usage.service';
@@ -29,11 +32,14 @@ export class WhatsappService {
     private readonly whatsappNumberRepository: Repository<WhatsappNumber>,
     @InjectRepository(WhatsappTemplate)
     private readonly whatsappTemplateRepository: Repository<WhatsappTemplate>,
+    @InjectRepository(Message)
+    private readonly messageRepository: Repository<Message>,
     private readonly configService: ConfigService,
     private readonly conversationsService: ConversationsService,
     private readonly contactsService: ContactsService,
     @InjectQueue('whatsapp') private readonly whatsappQueue: Queue,
     private readonly usageService: UsageService,
+    @Optional() private readonly mediaService: MediaService,
   ) {}
 
   private encrypt(text: string): string {
@@ -626,5 +632,54 @@ export class WhatsappService {
         { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
       );
     }
+  }
+
+  async getMediaUrl(messageId: string, companyId: string): Promise<{ url?: string; stream?: any; mimeType: string }> {
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId, companyId },
+    });
+    if (!message) throw new NotFoundException('Mensagem não encontrada');
+
+    // S3 disponível: retorna pre-signed URL (15min)
+    if (message.metadata?.s3Key && this.mediaService) {
+      const url = await this.mediaService.getPresignedUrl(message.metadata.s3Key);
+      return { url, mimeType: message.metadata.mimeType || 'application/octet-stream' };
+    }
+
+    // Fallback: stream direto da Meta
+    const raw = message.metadata?.raw;
+    const mediaId =
+      raw?.audio?.id ||
+      raw?.image?.id ||
+      raw?.video?.id ||
+      raw?.document?.id ||
+      raw?.sticker?.id;
+
+    if (!mediaId) throw new BadRequestException('Mensagem não contém mídia');
+
+    const whatsappNumberId = message.whatsappNumberId;
+    if (!whatsappNumberId) throw new BadRequestException('Número WhatsApp não identificado');
+
+    const whatsappNumber = await this.findById(whatsappNumberId, companyId);
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const metaRes = await axios.get(`${apiUrl}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const { url, mime_type } = metaRes.data;
+
+    const mediaStream = await axios.get(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      responseType: 'stream',
+    });
+
+    return { stream: mediaStream.data, mimeType: mime_type || 'audio/ogg' };
+  }
+
+  // @deprecated use getMediaUrl
+  async getMediaStream(messageId: string, companyId: string): Promise<{ stream: any; mimeType: string }> {
+    const result = await this.getMediaUrl(messageId, companyId);
+    return { stream: result.stream, mimeType: result.mimeType };
   }
 }

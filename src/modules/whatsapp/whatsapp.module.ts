@@ -6,6 +6,8 @@ import { WhatsappService } from './whatsapp.service';
 import { WebhookController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
 import { WhatsappProcessor } from './whatsapp.processor';
+import { MediaProcessor } from './media.processor';
+import { MediaService } from './media.service';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { Broadcast } from '../broadcasts/broadcast.entity';
@@ -20,14 +22,14 @@ import { BillingModule } from '../billing/billing.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, Broadcast, BroadcastRecipient, Message, AutomationExecution]),
-    BullModule.registerQueue({ name: 'whatsapp' }),
+    BullModule.registerQueue({ name: 'whatsapp' }, { name: 'media' }),
     ConversationsModule,
     ContactsModule,
     AiModule,
     BillingModule,
   ],
   controllers: [WhatsappController, WebhookController],
-  providers: [WhatsappService, WebhookService, WhatsappProcessor],
+  providers: [WhatsappService, WebhookService, WhatsappProcessor, MediaProcessor, MediaService],
   exports: [WhatsappService],
 })
 export class WhatsappModule {}

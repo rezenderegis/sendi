@@ -1,8 +1,9 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Job } from 'bull';
+import { Job, Queue } from 'bull';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
@@ -92,6 +93,7 @@ export class WhatsappProcessor {
     private readonly contactsService: ContactsService,
     private readonly aiService: AiService,
     private readonly whatsappService: WhatsappService,
+    @InjectQueue('media') private readonly mediaQueue: Queue,
     @InjectRepository(BroadcastRecipient)
     private readonly recipientRepo: Repository<BroadcastRecipient>,
     @InjectRepository(Message)
@@ -160,7 +162,7 @@ export class WhatsappProcessor {
         content = `[${message.type}]`;
       }
 
-      await this.conversationsService.saveMessage({
+      const savedMessage = await this.conversationsService.saveMessage({
         conversationId: conversation.id,
         companyId,
         direction: MessageDirection.INBOUND,
@@ -172,6 +174,11 @@ export class WhatsappProcessor {
       });
 
       this.logger.log(`Mensagem inbound processada: ${message.id} de ${fromPhone}`);
+
+      const MEDIA_TYPES = [MessageType.IMAGE, MessageType.AUDIO, MessageType.VIDEO, MessageType.DOCUMENT];
+      if (MEDIA_TYPES.includes(type)) {
+        await this.mediaQueue.add('upload-media', { messageId: savedMessage.id, companyId }, { attempts: 3, backoff: 5000 });
+      }
 
       // Classificar sentimento na primeira resposta de campanha
       if (conversation.campaignBroadcastId && message.type === 'text') {

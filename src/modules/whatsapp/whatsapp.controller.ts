@@ -8,8 +8,10 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
 import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
@@ -119,5 +121,21 @@ export class WhatsappController {
     @Body() dto: SendMessageDto,
   ) {
     return this.whatsappService.sendMessage(companyId, dto);
+  }
+
+  @Get('messages/:messageId/media')
+  @ApiOperation({ summary: 'Stream de mídia (áudio, imagem, vídeo, documento)' })
+  async getMedia(
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.whatsappService.getMediaUrl(messageId, companyId);
+    if (result.url) {
+      return res.redirect(302, result.url);
+    }
+    res.set('Content-Type', result.mimeType);
+    res.set('Cache-Control', 'private, max-age=300');
+    result.stream.pipe(res);
   }
 }
