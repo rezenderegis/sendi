@@ -63,6 +63,9 @@ import { AdminModule } from './modules/admin/admin.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get<string>('NODE_ENV') !== 'production',
         logging: config.get<string>('NODE_ENV') === 'development',
+        ssl: config.get<string>('DATABASE_HOST')?.includes('rds.amazonaws.com')
+          ? { rejectUnauthorized: false }
+          : false,
       }),
     }),
 
