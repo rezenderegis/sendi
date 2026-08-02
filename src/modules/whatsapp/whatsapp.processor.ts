@@ -169,6 +169,7 @@ export class WhatsappProcessor {
         type,
         content,
         whatsappMessageId: message.id,
+        whatsappNumberId: whatsappNumber.id,
         status: MessageStatus.DELIVERED,
         metadata: { raw: message },
       });

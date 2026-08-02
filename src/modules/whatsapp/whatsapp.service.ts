@@ -657,7 +657,11 @@ export class WhatsappService {
 
     if (!mediaId) throw new BadRequestException('Mensagem não contém mídia');
 
-    const whatsappNumberId = message.whatsappNumberId;
+    let whatsappNumberId = message.whatsappNumberId;
+    if (!whatsappNumberId) {
+      const conversation = await this.conversationsService.findById(message.conversationId, companyId);
+      whatsappNumberId = conversation.whatsappNumberId;
+    }
     if (!whatsappNumberId) throw new BadRequestException('Número WhatsApp não identificado');
 
     const whatsappNumber = await this.findById(whatsappNumberId, companyId);
