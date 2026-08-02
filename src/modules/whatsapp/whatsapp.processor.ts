@@ -2,8 +2,10 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { Job, Queue } from 'bull';
+import axios from 'axios';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
@@ -93,6 +95,7 @@ export class WhatsappProcessor {
     private readonly contactsService: ContactsService,
     private readonly aiService: AiService,
     private readonly whatsappService: WhatsappService,
+    private readonly configService: ConfigService,
     @InjectQueue('media') private readonly mediaQueue: Queue,
     @InjectRepository(BroadcastRecipient)
     private readonly recipientRepo: Repository<BroadcastRecipient>,
@@ -133,6 +136,7 @@ export class WhatsappProcessor {
 
       let content = '';
       let type = MessageType.TEXT;
+      let transcription: string | null = null;
 
       if (message.type === 'text') {
         content = message.text?.body || '';
@@ -152,6 +156,7 @@ export class WhatsappProcessor {
       } else if (message.type === 'audio') {
         content = '[Áudio]';
         type = MessageType.AUDIO;
+        transcription = await this.transcribeWhatsappAudio(message, whatsappNumber);
       } else if (message.type === 'video') {
         content = message.video?.caption || '[Vídeo]';
         type = MessageType.VIDEO;
@@ -171,7 +176,7 @@ export class WhatsappProcessor {
         whatsappMessageId: message.id,
         whatsappNumberId: whatsappNumber.id,
         status: MessageStatus.DELIVERED,
-        metadata: { raw: message },
+        metadata: { raw: message, ...(transcription ? { transcription } : {}) },
       });
 
       this.logger.log(`Mensagem inbound processada: ${message.id} de ${fromPhone}`);
@@ -181,14 +186,18 @@ export class WhatsappProcessor {
         await this.mediaQueue.add('upload-media', { messageId: savedMessage.id, companyId }, { attempts: 3, backoff: 5000 });
       }
 
+      const isAudioWithTranscription = type === MessageType.AUDIO && !!transcription;
+      const botContent = isAudioWithTranscription ? transcription! : content;
+
       // Classificar sentimento na primeira resposta de campanha
-      if (conversation.campaignBroadcastId && message.type === 'text') {
+      const isTextLike = type === MessageType.TEXT || isAudioWithTranscription;
+      if (conversation.campaignBroadcastId && isTextLike) {
         const recipient = await this.recipientRepo.findOne({
           where: { broadcastId: conversation.campaignBroadcastId, contactId: contact.id },
         });
         if (recipient && !recipient.respondedAt) {
           recipient.respondedAt = new Date();
-          recipient.responseSentiment = await this.aiService.classifySentiment(content) as any;
+          recipient.responseSentiment = await this.aiService.classifySentiment(botContent) as any;
           await this.recipientRepo.save(recipient);
         }
 
@@ -204,7 +213,7 @@ export class WhatsappProcessor {
           });
           const questionContext = lastOutbound?.content ?? broadcast.message ?? undefined;
           const intents = broadcast.intentRules.map((r) => r.intent);
-          const matchedIdx = await this.aiService.classifyIntent(content, intents, questionContext);
+          const matchedIdx = await this.aiService.classifyIntent(botContent, intents, questionContext);
           if (matchedIdx >= 0) {
             try {
               await this.conversationsService.addTag(
@@ -219,14 +228,14 @@ export class WhatsappProcessor {
         }
       }
 
-      if (type !== MessageType.TEXT) return;
+      if (type !== MessageType.TEXT && !isAudioWithTranscription) return;
 
       if (conversation.aiState === 'human_requested') return;
 
       const contactHasName = contact.name !== contact.phone;
 
       if (conversation.aiState === 'waiting_name') {
-        const name = content.trim();
+        const name = botContent.trim();
         await this.contactsService.update(contact.id, companyId, { name });
         await this.conversationsService.updateAiState(conversation.id, null);
         await this.whatsappService.sendBotReply(
@@ -245,7 +254,7 @@ export class WhatsappProcessor {
           conversation.id,
           companyId,
         );
-      } else if (isSupportRequest(content)) {
+      } else if (isSupportRequest(botContent)) {
         await this.conversationsService.updateAiState(conversation.id, 'human_requested');
         await this.whatsappService.sendBotReply(
           whatsappNumber,
@@ -254,7 +263,7 @@ export class WhatsappProcessor {
           conversation.id,
           companyId,
         );
-      } else if (isRequestingHuman(content)) {
+      } else if (isRequestingHuman(botContent)) {
         await this.conversationsService.updateAiState(conversation.id, 'human_requested');
         await this.whatsappService.sendBotReply(
           whatsappNumber,
@@ -267,7 +276,7 @@ export class WhatsappProcessor {
         const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, whatsappNumber.botHistoryLimit ?? DEFAULT_BOT_HISTORY_LIMIT);
         const history = recentMessages.map((msg) => ({
           role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
-          content: msg.content,
+          content: isAudioWithTranscription && msg.id === savedMessage.id ? botContent : msg.content,
         }));
         const now = new Date();
         const campaignStillActive =
@@ -362,6 +371,32 @@ export class WhatsappProcessor {
     } catch (error) {
       this.logger.error(`Erro ao processar status update: ${error.message}`, error.stack);
       throw error;
+    }
+  }
+
+  private async transcribeWhatsappAudio(message: any, whatsappNumber: any): Promise<string | null> {
+    try {
+      const mediaId = message.audio?.id;
+      if (!mediaId) return null;
+
+      const accessToken = (this.whatsappService as any).decrypt(whatsappNumber.accessToken);
+      const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+      const metaRes = await axios.get(`${apiUrl}/${mediaId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const { url, mime_type } = metaRes.data;
+
+      const audioRes = await axios.get(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        responseType: 'arraybuffer',
+      });
+
+      const buffer = Buffer.from(audioRes.data);
+      return await this.aiService.transcribeAudio(buffer, mime_type || 'audio/ogg');
+    } catch (err: any) {
+      this.logger.warn(`Falha ao transcrever áudio: ${err.message}`);
+      return null;
     }
   }
 

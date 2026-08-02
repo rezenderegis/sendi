@@ -106,6 +106,23 @@ export class AiService {
     return -1;
   }
 
+  async transcribeAudio(buffer: Buffer, mimeType: string): Promise<string | null> {
+    try {
+      const ext = mimeType?.split('/')?.[1]?.split(';')?.[0] || 'ogg';
+      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+      const file = new File([arrayBuffer], `audio.${ext}`, { type: mimeType });
+      const result = await this.client.audio.transcriptions.create({
+        file,
+        model: 'whisper-1',
+        language: 'pt',
+      });
+      return result.text || null;
+    } catch (err: any) {
+      this.logger.warn(`Falha ao transcrever áudio: ${err.message}`);
+      return null;
+    }
+  }
+
   async chat(
     contactName: string,
     history: { role: 'user' | 'assistant'; content: string }[],
