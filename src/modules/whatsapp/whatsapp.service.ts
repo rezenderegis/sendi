@@ -314,6 +314,70 @@ export class WhatsappService {
     return { message, whatsappMessageId, conversationId: conversation.id };
   }
 
+  async sendAudioMessage(
+    companyId: string,
+    whatsappNumberId: string,
+    to: string,
+    audioBuffer: Buffer,
+    mimeType: string,
+  ): Promise<any> {
+    const whatsappNumber = await this.findById(whatsappNumberId, companyId);
+    const costCents = await this.usageService.costForMessage({ isBot: false });
+    await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
+
+    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+    const toClean = to.replace(/\D/g, '');
+
+    // 1. Upload do arquivo de mídia para o WhatsApp
+    const FormData = (await import('form-data')).default;
+    const form = new FormData();
+    form.append('file', audioBuffer, { filename: 'audio.ogg', contentType: mimeType });
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mimeType);
+
+    const uploadRes = await axios.post(
+      `${apiUrl}/${whatsappNumber.phoneNumberId}/media`,
+      form,
+      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}` } },
+    );
+    const mediaId = uploadRes.data?.id;
+    if (!mediaId) throw new BadRequestException('Falha ao fazer upload do áudio para o WhatsApp');
+
+    // 2. Enviar mensagem de áudio
+    const msgRes = await axios.post(
+      `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: toClean,
+        type: 'audio',
+        audio: { id: mediaId },
+      },
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } },
+    );
+
+    const whatsappMessageId = msgRes.data?.messages?.[0]?.id;
+
+    const contact = await this.contactsService.findOrCreateByPhone(toClean, companyId);
+    const conversation = await this.conversationsService.findOrCreate(companyId, contact.id, whatsappNumber.id);
+
+    const message = await this.conversationsService.saveMessage({
+      conversationId: conversation.id,
+      companyId,
+      direction: MessageDirection.OUTBOUND,
+      type: MessageType.AUDIO,
+      content: '[Áudio]',
+      whatsappMessageId,
+      status: MessageStatus.SENT,
+      whatsappNumberId: whatsappNumber.id,
+      costCents,
+    });
+    await this.usageService.recordSend(companyId, costCents);
+
+    return { message, whatsappMessageId, conversationId: conversation.id };
+  }
+
   async sendTestMessage(id: string, companyId: string): Promise<any> {
     const whatsappNumber = await this.findById(id, companyId);
     const accessToken = this.decrypt(whatsappNumber.accessToken);

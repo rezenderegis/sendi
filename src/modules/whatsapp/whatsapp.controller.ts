@@ -8,9 +8,15 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
   Res,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
@@ -121,6 +127,26 @@ export class WhatsappController {
     @Body() dto: SendMessageDto,
   ) {
     return this.whatsappService.sendMessage(companyId, dto);
+  }
+
+  @Post('messages/send-audio')
+  @ApiOperation({ summary: 'Enviar mensagem de áudio gravada pelo atendente' })
+  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 16 * 1024 * 1024 } }))
+  async sendAudio(
+    @CurrentUser('companyId') companyId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('whatsappNumberId') whatsappNumberId: string,
+    @Body('to') to: string,
+  ) {
+    if (!file) throw new BadRequestException('Arquivo de áudio obrigatório');
+    if (!whatsappNumberId || !to) throw new BadRequestException('whatsappNumberId e to são obrigatórios');
+    return this.whatsappService.sendAudioMessage(
+      companyId,
+      whatsappNumberId,
+      to,
+      file.buffer,
+      file.mimetype || 'audio/ogg',
+    );
   }
 
   @Get('messages/:messageId/media')
