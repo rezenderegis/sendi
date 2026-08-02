@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
+import FormData from 'form-data';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
@@ -330,17 +331,23 @@ export class WhatsappService {
     const toClean = to.replace(/\D/g, '');
 
     // 1. Upload do arquivo de mídia para o WhatsApp
-    const FormData = (await import('form-data')).default;
+    const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'aac';
     const form = new FormData();
-    form.append('file', audioBuffer, { filename: 'audio.ogg', contentType: mimeType });
+    form.append('file', audioBuffer, { filename: `audio.${ext}`, contentType: mimeType });
     form.append('messaging_product', 'whatsapp');
-    form.append('type', mimeType);
 
-    const uploadRes = await axios.post(
-      `${apiUrl}/${whatsappNumber.phoneNumberId}/media`,
-      form,
-      { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}` } },
-    );
+    let uploadRes: any;
+    try {
+      uploadRes = await axios.post(
+        `${apiUrl}/${whatsappNumber.phoneNumberId}/media`,
+        form,
+        { headers: { ...form.getHeaders(), Authorization: `Bearer ${accessToken}` } },
+      );
+    } catch (err: any) {
+      const metaErr = err?.response?.data?.error?.message ?? err.message;
+      this.logger.error(`Falha upload de áudio para Meta: ${metaErr}`);
+      throw new BadRequestException(`Erro ao enviar áudio: ${metaErr}`);
+    }
     const mediaId = uploadRes.data?.id;
     if (!mediaId) throw new BadRequestException('Falha ao fazer upload do áudio para o WhatsApp');
 
