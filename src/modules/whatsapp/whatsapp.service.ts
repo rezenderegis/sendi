@@ -11,7 +11,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
-import FormData from 'form-data';
+import * as FormData from 'form-data';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
