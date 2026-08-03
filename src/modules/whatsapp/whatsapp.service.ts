@@ -379,6 +379,10 @@ export class WhatsappService {
       status: MessageStatus.SENT,
       whatsappNumberId: whatsappNumber.id,
       costCents,
+      metadata: {
+        raw: { audio: { id: mediaId } },
+        mimeType,
+      },
     });
     await this.usageService.recordSend(companyId, costCents);
 
