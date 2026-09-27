@@ -198,6 +198,30 @@ export class BroadcastsService {
       where: { broadcastId: id, status: RecipientStatus.PENDING },
     });
 
+    let toEnqueue = recipients;
+
+    if (broadcast.skipIfAlreadyMessaged && recipients.length) {
+      const contactIds = recipients.map((r) => r.contactId);
+      const rows = await this.messageRepo
+        .createQueryBuilder('m')
+        .innerJoin('m.conversation', 'c')
+        .where('m.direction = :direction', { direction: MessageDirection.OUTBOUND })
+        .andWhere('m.whatsappNumberId = :whatsappNumberId', { whatsappNumberId: broadcast.whatsappNumberId })
+        .andWhere('c.contactId IN (:...contactIds)', { contactIds })
+        .select('DISTINCT c.contactId', 'contactId')
+        .getRawMany();
+      const alreadyMessaged = new Set(rows.map((r) => r.contactId));
+
+      const toSkip = recipients.filter((r) => alreadyMessaged.has(r.contactId));
+      toEnqueue = recipients.filter((r) => !alreadyMessaged.has(r.contactId));
+
+      if (toSkip.length) {
+        for (const r of toSkip) r.status = RecipientStatus.SKIPPED;
+        await this.recipientRepo.save(toSkip);
+        broadcast.skippedCount += toSkip.length;
+      }
+    }
+
     const isTemplate = broadcast.type === BroadcastType.TEMPLATE;
     const templateCategory = isTemplate && broadcast.templateName
       ? (await this.whatsappTemplateRepo.findOne({
@@ -205,12 +229,12 @@ export class BroadcastsService {
         }))?.category ?? null
       : null;
 
-    await this.usageService.assertBudgetForBroadcast(companyId, recipients.length, { isTemplate, category: templateCategory });
+    await this.usageService.assertBudgetForBroadcast(companyId, toEnqueue.length, { isTemplate, category: templateCategory });
 
-    for (let i = 0; i < recipients.length; i++) {
+    for (let i = 0; i < toEnqueue.length; i++) {
       await this.broadcastQueue.add(
         'send-message',
-        { broadcastId: id, recipientId: recipients[i].id },
+        { broadcastId: id, recipientId: toEnqueue[i].id },
         {
           delay: i * 1200,
           attempts: 3,
@@ -219,7 +243,12 @@ export class BroadcastsService {
       );
     }
 
-    broadcast.status = BroadcastStatus.QUEUED;
+    if (toEnqueue.length === 0) {
+      broadcast.status = BroadcastStatus.COMPLETED;
+      broadcast.completedAt = new Date();
+    } else {
+      broadcast.status = BroadcastStatus.QUEUED;
+    }
     return this.broadcastRepo.save(broadcast);
   }
 

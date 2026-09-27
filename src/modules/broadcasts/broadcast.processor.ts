@@ -103,7 +103,7 @@ export class BroadcastProcessor {
 
     await this.recipientRepo.save(recipient);
 
-    if (broadcast.sentCount + broadcast.failedCount >= broadcast.totalCount) {
+    if (broadcast.sentCount + broadcast.failedCount + broadcast.skippedCount >= broadcast.totalCount) {
       broadcast.status = BroadcastStatus.COMPLETED;
       broadcast.completedAt = new Date();
     }

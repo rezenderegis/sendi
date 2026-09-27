@@ -107,6 +107,12 @@ export class Broadcast {
   @Column({ nullable: true })
   tagId: string | null;
 
+  @Column({ default: false })
+  skipIfAlreadyMessaged: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  skippedCount: number;
+
   @ManyToOne(() => Tag, { nullable: true, eager: false })
   @JoinColumn({ name: 'tagId' })
   tag: Tag | null;

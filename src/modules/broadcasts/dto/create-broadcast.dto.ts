@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class IntentRuleDto {
@@ -60,6 +60,11 @@ export class CreateBroadcastDto {
   @IsEnum(BroadcastMode)
   mode?: BroadcastMode;
 
+  @ApiPropertyOptional({ default: false, description: 'Pula destinatários que já receberam mensagem deste número antes' })
+  @IsOptional()
+  @IsBoolean()
+  skipIfAlreadyMessaged?: boolean;
+
 }
 
 export class UpdateBroadcastDto {
@@ -105,6 +110,11 @@ export class UpdateBroadcastDto {
   @ValidateNested({ each: true })
   @Type(() => IntentRuleDto)
   intentRules?: IntentRuleDto[];
+
+  @ApiPropertyOptional({ default: false, description: 'Pula destinatários que já receberam mensagem deste número antes' })
+  @IsOptional()
+  @IsBoolean()
+  skipIfAlreadyMessaged?: boolean;
 }
 
 export class AddRecipientsDto {
