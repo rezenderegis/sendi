@@ -4,13 +4,15 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Company } from '../companies/company.entity';
+import { FlowStep } from './flow-step.entity';
 
-@Entity('campaign_prompts')
-export class CampaignPrompt {
+@Entity('flows')
+export class Flow {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -25,13 +27,13 @@ export class CampaignPrompt {
   name: string;
 
   @Column({ type: 'text' })
-  content: string;
+  description: string;
 
-  @Column({ type: 'jsonb', nullable: true, default: null })
-  enabledToolNames: string[] | null;
+  @Column({ nullable: true })
+  startStepId: string | null;
 
-  @Column({ type: 'jsonb', nullable: true, default: null })
-  enabledFlowNames: string[] | null;
+  @OneToMany(() => FlowStep, (step) => step.flow)
+  steps: FlowStep[];
 
   @CreateDateColumn()
   createdAt: Date;

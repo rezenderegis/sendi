@@ -8,6 +8,7 @@ import axios from 'axios';
 import { Message } from '../conversations/message.entity';
 import { WhatsappService } from './whatsapp.service';
 import { MediaService } from './media.service';
+import { decrypt } from '../../common/utils/crypto.util';
 
 @Processor('media')
 export class MediaProcessor {
@@ -36,8 +37,7 @@ export class MediaProcessor {
     if (!mediaId) return;
 
     const whatsappNumber = await this.whatsappService.findById(message.whatsappNumberId, companyId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const accessToken = (this.whatsappService as any).decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const metaRes = await axios.get(`${apiUrl}/${mediaId}`, {

@@ -92,6 +92,9 @@ export class Conversation {
   @Column({ default: false })
   waitingReply: boolean;
 
+  @Column({ type: 'jsonb', nullable: true })
+  variables: Record<string, any> | null;
+
   @Column({ nullable: true })
   kanbanColumnId: string | null;
 

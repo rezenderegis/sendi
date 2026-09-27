@@ -26,6 +26,14 @@ export class PlatformSettings {
   @Column({ type: 'int', default: 0 })
   costPerAuthenticationMessageCents: number;
 
+  // Guardrail global (proteção do dono da plataforma, não visível pro cliente): usado como limite
+  // padrão pra todo número que não tiver dailySpendLimitCents/monthlySpendLimitCents próprio definido.
+  @Column({ type: 'int', nullable: true })
+  defaultDailySpendLimitCents: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  defaultMonthlySpendLimitCents: number | null;
+
   @UpdateDateColumn()
   updatedAt: Date;
 }

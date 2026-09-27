@@ -37,6 +37,18 @@ export class UpdatePlatformSettingsDto {
   @IsInt()
   @Min(0)
   costPerAuthenticationMessageCents?: number;
+
+  @ApiPropertyOptional({ example: 5000, description: 'Guardrail global (proteção da plataforma): limite diário padrão, em centavos, pra todo número sem limite próprio definido. Null/omitido = sem limite padrão.' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  defaultDailySpendLimitCents?: number;
+
+  @ApiPropertyOptional({ example: 100000, description: 'Guardrail global (proteção da plataforma): limite mensal padrão, em centavos, pra todo número sem limite próprio definido.' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  defaultMonthlySpendLimitCents?: number;
 }
 
 export class CreditBalanceDto {

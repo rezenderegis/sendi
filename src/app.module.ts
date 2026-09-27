@@ -25,6 +25,10 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { KanbanColumnsModule } from './modules/kanban-columns/kanban-columns.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ExternalActionsModule } from './modules/external-actions/external-actions.module';
+import { FlowStepsModule } from './modules/flow-steps/flow-steps.module';
+import { MockApiModule } from './modules/mock-api/mock-api.module';
+import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-triggers.module';
 
 @Module({
   imports: [
@@ -100,6 +104,11 @@ import { AdminModule } from './modules/admin/admin.module';
     KanbanColumnsModule,
     BillingModule,
     AdminModule,
+    ExternalActionsModule,
+    FlowStepsModule,
+    WebhookTriggersModule,
+    // Endpoints fake pra usar como Bot Tools em testes/demos — nunca em produção.
+    ...(process.env.NODE_ENV !== 'production' ? [MockApiModule] : []),
   ],
   controllers: [HealthController],
 })

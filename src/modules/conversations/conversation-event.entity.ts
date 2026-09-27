@@ -5,6 +5,8 @@ export enum ConversationEventType {
   CAMPAIGN_RESET_HUMAN = 'campaign_reset_human',
   CAMPAIGN_RESET_MANUAL = 'campaign_reset_manual',
   CAMPAIGN_EXPIRED = 'campaign_expired',
+  EXTERNAL_ACTION_CALLED = 'external_action_called',
+  FLOW_ACTION_EXECUTED = 'flow_action_executed',
 }
 
 @Entity('conversation_events')

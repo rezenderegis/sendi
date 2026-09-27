@@ -59,6 +59,15 @@ export class CampaignPromptsController {
     return this.service.delete(id, companyId);
   }
 
+  @Get(':id/executions')
+  @ApiOperation({ summary: 'Conversas reais onde este prompt foi usado (via broadcast ou automação)' })
+  getExecutions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.getExecutions(id, companyId);
+  }
+
   @Get(':id/versions')
   @ApiOperation({ summary: 'Listar versões anteriores do prompt' })
   getVersions(

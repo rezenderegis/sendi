@@ -253,6 +253,20 @@ export class ContactsService {
     await this.contactRepository.save(contact);
   }
 
+  async setMetadataField(id: string, companyId: string, name: string, value: any): Promise<void> {
+    await this.contactRepository.query(
+      `UPDATE contacts SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb WHERE id = $2 AND "companyId" = $3`,
+      [JSON.stringify({ [name]: value }), id, companyId],
+    );
+  }
+
+  async setMetadataFields(id: string, companyId: string, patch: Record<string, any>): Promise<void> {
+    await this.contactRepository.query(
+      `UPDATE contacts SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb WHERE id = $2 AND "companyId" = $3`,
+      [JSON.stringify(patch), id, companyId],
+    );
+  }
+
   async delete(id: string, companyId: string): Promise<void> {
     const contact = await this.findById(id, companyId);
     await this.contactRepository.remove(contact);

@@ -254,6 +254,13 @@ export class ConversationsService {
     await this.conversationRepository.update(conversationId, { aiState: state });
   }
 
+  async setVariable(id: string, name: string, value: any): Promise<void> {
+    await this.conversationRepository.query(
+      `UPDATE conversations SET variables = COALESCE(variables, '{}'::jsonb) || $1::jsonb WHERE id = $2`,
+      [JSON.stringify({ [name]: value }), id],
+    );
+  }
+
   async getRecentMessages(conversationId: string, limit = 10): Promise<Message[]> {
     const messages = await this.messageRepository.find({
       where: { conversationId },

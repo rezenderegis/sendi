@@ -6,6 +6,8 @@ import { BalanceTransaction, BalanceTransactionType } from './balance-transactio
 import { Company } from '../companies/company.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { Message, MessageDirection } from '../conversations/message.entity';
+import { User } from '../users/user.entity';
+import { AppNotification } from '../follow-ons/notification.entity';
 
 function startOfDay(): Date {
   const d = new Date();
@@ -69,6 +71,10 @@ export class UsageService {
     private readonly numberRepo: Repository<WhatsappNumber>,
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(AppNotification)
+    private readonly notificationRepo: Repository<AppNotification>,
   ) {}
 
   async getSettings(): Promise<PlatformSettings> {
@@ -79,7 +85,8 @@ export class UsageService {
 
   async updateSettings(dto: Partial<Pick<PlatformSettings,
     'costPerOutboundMessageCents' | 'costPerBotMessageCents' | 'costPerFreeTextMessageCents' |
-    'costPerMarketingMessageCents' | 'costPerUtilityMessageCents' | 'costPerAuthenticationMessageCents'
+    'costPerMarketingMessageCents' | 'costPerUtilityMessageCents' | 'costPerAuthenticationMessageCents' |
+    'defaultDailySpendLimitCents' | 'defaultMonthlySpendLimitCents'
   >>): Promise<PlatformSettings> {
     const settings = await this.getSettings();
     Object.assign(settings, dto);
@@ -151,19 +158,46 @@ export class UsageService {
     const number = await this.numberRepo.findOne({ where: { id: whatsappNumberId } });
     if (!number) throw new ForbiddenException('Número WhatsApp não encontrado');
 
-    if (number.dailySpendLimitCents != null) {
+    const settings = await this.getSettings();
+    const dailyLimit = number.dailySpendLimitCents ?? settings.defaultDailySpendLimitCents;
+    const monthlyLimit = number.monthlySpendLimitCents ?? settings.defaultMonthlySpendLimitCents;
+
+    if (dailyLimit != null) {
       const daySpend = await this.getSpendBreakdown({ whatsappNumberId }, startOfDay());
-      if (daySpend.totalCostCents + costCents > number.dailySpendLimitCents) {
+      if (daySpend.totalCostCents + costCents > dailyLimit) {
+        await this.alertSpendLimitExceeded(number, company, 'diário', dailyLimit);
         throw new ForbiddenException('Limite diário de gasto atingido para este número');
       }
     }
 
-    if (number.monthlySpendLimitCents != null) {
+    if (monthlyLimit != null) {
       const monthSpend = await this.getSpendBreakdown({ whatsappNumberId }, startOfMonth());
-      if (monthSpend.totalCostCents + costCents > number.monthlySpendLimitCents) {
+      if (monthSpend.totalCostCents + costCents > monthlyLimit) {
+        await this.alertSpendLimitExceeded(number, company, 'mensal', monthlyLimit);
         throw new ForbiddenException('Limite mensal de gasto atingido para este número');
       }
     }
+  }
+
+  /**
+   * Avisa os usuários da plataforma (isPlatformAdmin) quando um número é bloqueado por estourar
+   * o limite de gasto — no máximo 1 vez por dia por número, pra não spammar em caso de retentativas.
+   */
+  private async alertSpendLimitExceeded(number: WhatsappNumber, company: Company, scope: 'diário' | 'mensal', limitCents: number): Promise<void> {
+    const alreadyAlertedToday = number.lastSpendLimitAlertAt && number.lastSpendLimitAlertAt >= startOfDay();
+    if (alreadyAlertedToday) return;
+
+    await this.numberRepo.update(number.id, { lastSpendLimitAlertAt: new Date() });
+
+    const admins = await this.userRepo.find({ where: { isPlatformAdmin: true } });
+    const title = `⚠️ Limite de gasto atingido: ${number.displayName}`;
+    const body = `A empresa "${company.name}" teve envios bloqueados no número ${number.displayName} por atingir o limite ${scope} de gasto (R$ ${(limitCents / 100).toFixed(2).replace('.', ',')}).`;
+
+    await Promise.all(
+      admins.map((admin) =>
+        this.notificationRepo.save(this.notificationRepo.create({ companyId: admin.companyId, userId: admin.id, title, body })),
+      ),
+    );
   }
 
   async assertBudgetForBroadcast(

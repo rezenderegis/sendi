@@ -127,25 +127,63 @@ export class AiService {
     contactName: string,
     history: { role: 'user' | 'assistant'; content: string }[],
     systemPrompt?: string | null,
+    options?: {
+      tools?: { name: string; description: string; parameters: Record<string, any> }[];
+      executeTool?: (name: string, args: any) => Promise<{ success: boolean; result: any }>;
+    },
   ): Promise<string> {
     const template = systemPrompt || DEFAULT_SYSTEM_PROMPT;
     const resolvedPrompt = template.replace('${contactName}', contactName);
 
-    const response = await this.client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 200,
-      messages: [
-        { role: 'system', content: resolvedPrompt },
-        ...history,
-      ],
-    });
+    const messages: any[] = [
+      { role: 'system', content: resolvedPrompt },
+      ...history,
+    ];
 
-    const text = response.choices[0]?.message?.content;
-    if (!text) {
-      this.logger.warn('Resposta vazia do LLM');
-      return 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
+    const tools = options?.tools?.length
+      ? options.tools.map((t) => ({
+          type: 'function' as const,
+          function: { name: t.name, description: t.description, parameters: t.parameters },
+        }))
+      : undefined;
+
+    const MAX_TOOL_ROUNDS = 2;
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 200,
+        messages,
+        ...(tools && round < MAX_TOOL_ROUNDS ? { tools, tool_choice: 'auto' } : {}),
+      });
+
+      const choice = response.choices[0]?.message;
+      if (!choice) {
+        this.logger.warn('Resposta vazia do LLM');
+        return 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
+      }
+
+      if (!choice.tool_calls?.length || !options?.executeTool) {
+        return choice.content ?? 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
+      }
+
+      messages.push(choice);
+      for (const call of choice.tool_calls) {
+        if (call.type !== 'function') continue;
+        let args: any = {};
+        try {
+          args = JSON.parse(call.function.arguments || '{}');
+        } catch {
+          this.logger.warn(`Argumentos inválidos da tool ${call.function.name}: ${call.function.arguments}`);
+        }
+        const outcome = await options.executeTool(call.function.name, args);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(outcome.result ?? (outcome.success ? 'ok' : 'erro')),
+        });
+      }
     }
 
-    return text;
+    return 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
   }
 }

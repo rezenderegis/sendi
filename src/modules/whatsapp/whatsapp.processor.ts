@@ -9,13 +9,20 @@ import axios from 'axios';
 import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationEventType } from '../conversations/conversation-event.entity';
 import { ContactsService } from '../contacts/contacts.service';
+import { FlowStep, FlowStepType, ChoiceConfig, TextConfig } from '../flow-steps/flow-step.entity';
 import { AiService, DEFAULT_BOT_HISTORY_LIMIT } from '../ai/ai.service';
 import { WhatsappService } from './whatsapp.service';
+import { ExternalActionsService } from '../external-actions/external-actions.service';
+import { FlowStepsService } from '../flow-steps/flow-steps.service';
+import { FlowsService } from '../flow-steps/flows.service';
+import { FlowEngineService } from '../flow-steps/flow-engine.service';
 import { Message, MessageDirection, MessageStatus, MessageType } from '../conversations/message.entity';
 import { Broadcast } from '../broadcasts/broadcast.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 import { BroadcastRecipient, RecipientStatus } from '../broadcasts/broadcast-recipient.entity';
 import { AutomationExecution, AutomationExecutionStatus } from '../automations/automation-execution.entity';
 import { phoneAlternative } from '../../common/utils/phone.util';
+import { decrypt } from '../../common/utils/crypto.util';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -96,6 +103,10 @@ export class WhatsappProcessor {
     private readonly aiService: AiService,
     private readonly whatsappService: WhatsappService,
     private readonly configService: ConfigService,
+    private readonly externalActionsService: ExternalActionsService,
+    private readonly flowStepsService: FlowStepsService,
+    private readonly flowsService: FlowsService,
+    private readonly flowEngine: FlowEngineService,
     @InjectQueue('media') private readonly mediaQueue: Queue,
     @InjectRepository(BroadcastRecipient)
     private readonly recipientRepo: Repository<BroadcastRecipient>,
@@ -105,6 +116,8 @@ export class WhatsappProcessor {
     private readonly automationExecRepo: Repository<AutomationExecution>,
     @InjectRepository(Broadcast)
     private readonly broadcastRepo: Repository<Broadcast>,
+    @InjectRepository(CampaignPrompt)
+    private readonly campaignPromptRepo: Repository<CampaignPrompt>,
   ) {}
 
   @Process('inbound-message')
@@ -137,6 +150,7 @@ export class WhatsappProcessor {
       let content = '';
       let type = MessageType.TEXT;
       let transcription: string | null = null;
+      let interactiveReplyId: string | null = null;
 
       if (message.type === 'text') {
         content = message.text?.body || '';
@@ -149,6 +163,10 @@ export class WhatsappProcessor {
           message.interactive?.button_reply?.title ||
           message.interactive?.list_reply?.title ||
           '';
+        interactiveReplyId =
+          message.interactive?.button_reply?.id ||
+          message.interactive?.list_reply?.id ||
+          null;
         type = MessageType.TEXT;
       } else if (message.type === 'image') {
         content = message.image?.caption || '[Imagem]';
@@ -232,6 +250,127 @@ export class WhatsappProcessor {
 
       if (conversation.aiState === 'human_requested') return;
 
+      if (conversation.aiState?.startsWith('flow:')) {
+        const stepId = conversation.aiState.slice(5);
+        let step = await this.flowStepsService.findById(companyId, stepId);
+        if (!step) {
+          await this.conversationsService.updateAiState(conversation.id, null);
+          return;
+        }
+
+        // Defensivo: aiState só deveria apontar pra um bloco pausável (choice/text). Se não for,
+        // resolve a cadeia de blocos automáticos antes de tentar casar a resposta contra opções.
+        if (!this.flowEngine.isPausingBlock(step)) {
+          const sink = this.whatsappService.createFlowSink(whatsappNumber, fromPhone, conversation.id, companyId);
+          const outcome = await this.flowEngine.enterFlowStep(companyId, contact, conversation, sink, step);
+          if ('fellThrough' in outcome) {
+            await this.runAiTurn(conversation, contact, whatsappNumber, fromPhone, companyId, savedMessage.id, botContent, isAudioWithTranscription);
+          }
+          return;
+        }
+
+        let resolved: {
+          value: string;
+          label: string;
+          nextStepId: string | null;
+          endMessage: string | null;
+          saveAsVariable: { name: string; scope: 'contact' | 'conversation' } | null;
+          onAnswerActionName?: string | null;
+        };
+
+        if (step.stepType === FlowStepType.TEXT) {
+          const cfg = step.config as TextConfig;
+          resolved = {
+            value: botContent,
+            label: botContent,
+            nextStepId: step.nextStepId,
+            endMessage: cfg.endMessage,
+            saveAsVariable: cfg.saveAsVariable,
+            onAnswerActionName: cfg.onAnswerActionName,
+          };
+        } else {
+          const cfg = step.config as ChoiceConfig;
+          const normalizedContent = botContent.trim().toLowerCase();
+          const matched = cfg.options.find(
+            (o) =>
+              (interactiveReplyId && o.value === interactiveReplyId) ||
+              o.label.toLowerCase() === normalizedContent ||
+              o.value.toLowerCase() === normalizedContent,
+          );
+
+          if (!matched) {
+            await this.whatsappService.sendBotInteractive(
+              whatsappNumber,
+              fromPhone,
+              `Não entendi. ${cfg.questionText}`,
+              cfg.options,
+              conversation.id,
+              companyId,
+            );
+            return;
+          }
+
+          resolved = {
+            value: matched.value,
+            label: matched.label,
+            nextStepId: matched.nextStepId,
+            endMessage: matched.endMessage,
+            saveAsVariable: matched.saveAsVariable,
+            onAnswerActionName: cfg.onAnswerActionName,
+          };
+        }
+
+        if (resolved.onAnswerActionName) {
+          const action = (await this.externalActionsService.findActive(companyId)).find(
+            (a) => a.name === resolved.onAnswerActionName,
+          );
+          if (action) {
+            const outcome = await this.externalActionsService.execute(
+              action,
+              { valor: resolved.value, resposta: resolved.label },
+              this.flowEngine.buildToolContext(contact, conversation),
+            );
+            await this.conversationsService.createEvent(conversation.id, ConversationEventType.EXTERNAL_ACTION_CALLED, {
+              actionId: action.id,
+              actionName: action.name,
+              success: outcome.success,
+              error: outcome.error,
+              latencyMs: outcome.latencyMs,
+            });
+          }
+        }
+
+        if (resolved.saveAsVariable) {
+          const { name: varName, scope } = resolved.saveAsVariable;
+          if (scope === 'contact') {
+            await this.contactsService.setMetadataField(contact.id, companyId, varName, resolved.value);
+          } else {
+            await this.conversationsService.setVariable(conversation.id, varName, resolved.value);
+          }
+        }
+
+        const next = resolved.nextStepId ? await this.flowStepsService.findById(companyId, resolved.nextStepId) : null;
+        if (next) {
+          const sink = this.whatsappService.createFlowSink(whatsappNumber, fromPhone, conversation.id, companyId);
+          const outcome = await this.flowEngine.enterFlowStep(companyId, contact, conversation, sink, next);
+          if ('fellThrough' in outcome) {
+            await this.runAiTurn(conversation, contact, whatsappNumber, fromPhone, companyId, savedMessage.id, botContent, isAudioWithTranscription);
+          }
+          return;
+        }
+
+        await this.conversationsService.updateAiState(conversation.id, null);
+
+        if (resolved.endMessage) {
+          await this.whatsappService.sendBotReply(whatsappNumber, fromPhone, resolved.endMessage, conversation.id, companyId);
+          return;
+        }
+
+        // Sem próximo passo e sem mensagem de encerramento: devolve o controle pra IA imediatamente
+        await this.runAiTurn(conversation, contact, whatsappNumber, fromPhone, companyId, savedMessage.id, botContent, isAudioWithTranscription);
+        return;
+      }
+
       const contactHasName = contact.name !== contact.phone;
 
       if (conversation.aiState === 'waiting_name') {
@@ -273,53 +412,153 @@ export class WhatsappProcessor {
           companyId,
         );
       } else {
-        const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, whatsappNumber.botHistoryLimit ?? DEFAULT_BOT_HISTORY_LIMIT);
-        const history = recentMessages.map((msg) => ({
-          role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
-          content: isAudioWithTranscription && msg.id === savedMessage.id ? botContent : msg.content,
-        }));
-        const now = new Date();
-        const campaignStillActive =
-          conversation.campaignPrompt &&
-          conversation.campaignExpiresAt &&
-          conversation.campaignExpiresAt > now;
-        const campaignExpiredNow =
-          conversation.campaignPrompt &&
-          conversation.campaignExpiresAt &&
-          conversation.campaignExpiresAt <= now;
-
-        if (campaignExpiredNow) {
-          await this.conversationsService.createEvent(
-            conversation.id,
-            ConversationEventType.CAMPAIGN_EXPIRED,
-            { expiredAt: conversation.campaignExpiresAt },
-          );
-        }
-
-        const activeCampaignPrompt = campaignStillActive ? conversation.campaignPrompt : null;
-        let aiPromptSource: string;
-        if (activeCampaignPrompt) {
-          aiPromptSource = 'campaign';
-        } else if (whatsappNumber.systemPrompt) {
-          aiPromptSource = 'system';
-        } else {
-          aiPromptSource = 'default';
-        }
-
-        const reply = await this.aiService.chat(contact.name, history, activeCampaignPrompt ?? whatsappNumber.systemPrompt);
-        await this.whatsappService.sendBotReply(
-          whatsappNumber,
-          fromPhone,
-          reply,
-          conversation.id,
-          companyId,
-          aiPromptSource,
-        );
+        await this.runAiTurn(conversation, contact, whatsappNumber, fromPhone, companyId, savedMessage.id, botContent, isAudioWithTranscription);
       }
     } catch (error) {
       this.logger.error(`Erro ao processar mensagem inbound: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  private async runAiTurn(
+    conversation: any,
+    contact: any,
+    whatsappNumber: any,
+    fromPhone: string,
+    companyId: string,
+    savedMessageId: string,
+    botContent: string,
+    isAudioWithTranscription: boolean,
+  ): Promise<void> {
+    const recentMessages = await this.conversationsService.getRecentMessages(conversation.id, whatsappNumber.botHistoryLimit ?? DEFAULT_BOT_HISTORY_LIMIT);
+    const history = recentMessages.map((msg) => ({
+      role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+      content: isAudioWithTranscription && msg.id === savedMessageId ? botContent : msg.content,
+    }));
+    const now = new Date();
+    const campaignStillActive =
+      conversation.campaignPrompt &&
+      conversation.campaignExpiresAt &&
+      conversation.campaignExpiresAt > now;
+    const campaignExpiredNow =
+      conversation.campaignPrompt &&
+      conversation.campaignExpiresAt &&
+      conversation.campaignExpiresAt <= now;
+
+    if (campaignExpiredNow) {
+      await this.conversationsService.createEvent(
+        conversation.id,
+        ConversationEventType.CAMPAIGN_EXPIRED,
+        { expiredAt: conversation.campaignExpiresAt },
+      );
+    }
+
+    const activeCampaignPrompt = campaignStillActive ? conversation.campaignPrompt : null;
+    let aiPromptSource: string;
+    if (activeCampaignPrompt) {
+      aiPromptSource = 'campaign';
+    } else if (whatsappNumber.systemPrompt) {
+      aiPromptSource = 'system';
+    } else {
+      aiPromptSource = 'default';
+    }
+
+    let enabledToolNames = whatsappNumber.enabledToolNames as string[] | null;
+    let enabledFlowNames = whatsappNumber.enabledFlowNames as string[] | null;
+    if (activeCampaignPrompt && conversation.campaignBroadcastId) {
+      const broadcast = await this.broadcastRepo.findOne({ where: { id: conversation.campaignBroadcastId } });
+      const campaignPromptRecord = broadcast?.campaignPromptId
+        ? await this.campaignPromptRepo.findOne({ where: { id: broadcast.campaignPromptId } })
+        : null;
+      if (campaignPromptRecord?.enabledToolNames?.length) enabledToolNames = campaignPromptRecord.enabledToolNames;
+      if (campaignPromptRecord?.enabledFlowNames?.length) enabledFlowNames = campaignPromptRecord.enabledFlowNames;
+    }
+
+    const allActions = await this.externalActionsService.findActive(companyId);
+    const actions = enabledToolNames?.length ? allActions.filter((a) => enabledToolNames!.includes(a.name)) : allActions;
+    const tools = actions.map((a) => ({ name: a.name, description: a.description, parameters: a.parametersSchema }));
+
+    const allFlows = await this.flowsService.findAll(companyId);
+    const availableFlows = enabledFlowNames?.length ? allFlows.filter((f) => enabledFlowNames!.includes(f.name)) : allFlows;
+    if (availableFlows.length) {
+      tools.push({
+        name: 'iniciar_fluxo',
+        description: `Inicia um fluxo guiado de perguntas fixas. Fluxos disponíveis:\n${availableFlows.map((f) => `- ${f.name}: ${f.description}`).join('\n')}`,
+        parameters: {
+          type: 'object',
+          properties: { nome: { type: 'string', enum: availableFlows.map((f) => f.name) } },
+          required: ['nome'],
+        },
+      });
+    }
+
+    tools.push({
+      name: 'salvar_variavel',
+      description: 'Salva uma informação nova aprendida durante a conversa, pra usar depois em outras tools. Use escopo "contact" pra algo permanente sobre a pessoa (ex: nome da mãe), ou "conversation" pra algo que só vale nesse atendimento.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string', description: 'Nome da variável, ex: nomeMae' },
+          valor: { type: 'string' },
+          escopo: { type: 'string', enum: ['contact', 'conversation'] },
+        },
+        required: ['nome', 'valor', 'escopo'],
+      },
+    });
+
+    const executeTool = async (name: string, args: any) => {
+      if (name === 'salvar_variavel') {
+        if (!/^[a-z0-9_]+$/.test(args.nome ?? '')) {
+          return { success: false, result: 'nome de variável inválido' };
+        }
+        if (args.escopo === 'contact') {
+          await this.contactsService.setMetadataField(contact.id, companyId, args.nome, args.valor);
+        } else {
+          await this.conversationsService.setVariable(conversation.id, args.nome, args.valor);
+        }
+        return { success: true, result: 'variável salva' };
+      }
+
+      if (name === 'iniciar_fluxo') {
+        const flow = availableFlows.find((f) => f.name === args.nome);
+        if (!flow?.startStepId) return { success: false, result: 'fluxo não encontrado ou sem passo inicial definido' };
+        const step = await this.flowStepsService.findById(companyId, flow.startStepId);
+        if (!step) return { success: false, result: 'passo inicial não encontrado' };
+        const sink = this.whatsappService.createFlowSink(whatsappNumber, fromPhone, conversation.id, companyId);
+        const outcome = await this.flowEngine.enterFlowStep(companyId, contact, conversation, sink, step);
+        if ('fellThrough' in outcome) {
+          return { success: true, result: 'fluxo executado (só continha blocos automáticos) e encerrado imediatamente' };
+        }
+        return { success: true, result: 'fluxo iniciado' };
+      }
+
+      const action = actions.find((a) => a.name === name);
+      if (!action) return { success: false, result: 'ação não encontrada' };
+      const outcome = await this.externalActionsService.execute(action, args, this.flowEngine.buildToolContext(contact, conversation));
+      await this.conversationsService.createEvent(conversation.id, ConversationEventType.EXTERNAL_ACTION_CALLED, {
+        actionId: action.id,
+        actionName: action.name,
+        success: outcome.success,
+        error: outcome.error,
+        latencyMs: outcome.latencyMs,
+      });
+      return { success: outcome.success, result: outcome.responseData ?? outcome.error };
+    };
+
+    const reply = await this.aiService.chat(
+      contact.name,
+      history,
+      activeCampaignPrompt ?? whatsappNumber.systemPrompt,
+      tools.length ? { tools, executeTool } : undefined,
+    );
+    await this.whatsappService.sendBotReply(
+      whatsappNumber,
+      fromPhone,
+      reply,
+      conversation.id,
+      companyId,
+      aiPromptSource,
+    );
   }
 
   @Process('status-update')
@@ -379,7 +618,7 @@ export class WhatsappProcessor {
       const mediaId = message.audio?.id;
       if (!mediaId) return null;
 
-      const accessToken = (this.whatsappService as any).decrypt(whatsappNumber.accessToken);
+      const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
       const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
       const metaRes = await axios.get(`${apiUrl}/${mediaId}`, {
@@ -442,4 +681,5 @@ export class WhatsappProcessor {
       this.logger.warn(`Retry também falhou para ${alt}: ${err.message}`);
     }
   }
+
 }

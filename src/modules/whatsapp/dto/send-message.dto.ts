@@ -1,4 +1,4 @@
-import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum TemplateCategory {
@@ -67,6 +67,18 @@ export class UpdateWhatsappNumberDto {
   @ApiPropertyOptional({ example: 20, description: 'Quantidade de mensagens recentes enviadas ao LLM como contexto' })
   @IsOptional()
   botHistoryLimit?: number;
+
+  @ApiPropertyOptional({ type: [String], description: 'Nomes das Bot Tools habilitadas. Vazio/omitido = todas.' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledToolNames?: string[] | null;
+
+  @ApiPropertyOptional({ type: [String], description: 'Nomes dos fluxos (Fluxo Guiado) habilitados. Vazio/omitido = todos.' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledFlowNames?: string[] | null;
 }
 
 export class ConnectNumberDto {

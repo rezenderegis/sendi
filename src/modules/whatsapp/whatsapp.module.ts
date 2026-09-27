@@ -12,21 +12,26 @@ import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { Broadcast } from '../broadcasts/broadcast.entity';
 import { BroadcastRecipient } from '../broadcasts/broadcast-recipient.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 import { Message } from '../conversations/message.entity';
 import { AutomationExecution } from '../automations/automation-execution.entity';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AiModule } from '../ai/ai.module';
 import { BillingModule } from '../billing/billing.module';
+import { ExternalActionsModule } from '../external-actions/external-actions.module';
+import { FlowStepsModule } from '../flow-steps/flow-steps.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, Broadcast, BroadcastRecipient, Message, AutomationExecution]),
+    TypeOrmModule.forFeature([WhatsappNumber, WhatsappTemplate, Broadcast, BroadcastRecipient, Message, AutomationExecution, CampaignPrompt]),
     BullModule.registerQueue({ name: 'whatsapp' }, { name: 'media' }),
     ConversationsModule,
     ContactsModule,
     AiModule,
     BillingModule,
+    ExternalActionsModule,
+    FlowStepsModule,
   ],
   controllers: [WhatsappController, WebhookController],
   providers: [WhatsappService, WebhookService, WhatsappProcessor, MediaProcessor, MediaService],

@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import * as FormData from 'form-data';
+import { encrypt, decrypt } from '../../common/utils/crypto.util';
 import { WhatsappNumber } from './whatsapp-number.entity';
 import { WhatsappTemplate } from './whatsapp-template.entity';
 import { ConnectNumberDto, CreateTemplateDto, SendMessageDto, UpdateWhatsappNumberDto } from './dto/send-message.dto';
@@ -23,6 +24,7 @@ import { Message, MessageDirection, MessageStatus, MessageType } from '../conver
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { UsageService } from '../billing/usage.service';
+import { FlowMessageSink } from '../flow-steps/flow-engine.service';
 
 @Injectable()
 export class WhatsappService {
@@ -43,32 +45,8 @@ export class WhatsappService {
     @Optional() private readonly mediaService: MediaService,
   ) {}
 
-  private encrypt(text: string): string {
-    const key = Buffer.from(
-      this.configService.get<string>('ENCRYPTION_KEY').padEnd(32).slice(0, 32),
-    );
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-  }
-
-  private decrypt(encrypted: string): string {
-    const [ivHex, dataHex] = encrypted.split(':');
-    const key = Buffer.from(
-      this.configService.get<string>('ENCRYPTION_KEY').padEnd(32).slice(0, 32),
-    );
-    const iv = Buffer.from(ivHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(dataHex, 'hex')),
-      decipher.final(),
-    ]);
-    return decrypted.toString('utf8');
-  }
-
   async connectNumber(companyId: string, dto: ConnectNumberDto): Promise<WhatsappNumber> {
-    const encryptedToken = this.encrypt(dto.accessToken);
+    const encryptedToken = encrypt(dto.accessToken, this.configService);
     const verifyToken = crypto.randomBytes(16).toString('hex');
 
     const number = this.whatsappNumberRepository.create({
@@ -139,7 +117,7 @@ export class WhatsappService {
     const costCents = await this.usageService.costForMessage({ isBot: false, isTemplate, category: templateCategory });
     await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
 
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const to = dto.to.replace(/\D/g, '');
@@ -326,7 +304,7 @@ export class WhatsappService {
     const costCents = await this.usageService.costForMessage({ isBot: false });
     await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
 
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
     const toClean = to.replace(/\D/g, '');
 
@@ -391,7 +369,7 @@ export class WhatsappService {
 
   async sendTestMessage(id: string, companyId: string): Promise<any> {
     const whatsappNumber = await this.findById(id, companyId);
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const response = await axios.post(
@@ -426,7 +404,7 @@ export class WhatsappService {
     const costCents = await this.usageService.costForMessage({ isBot: true });
     await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
 
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const response = await axios.post(
@@ -464,9 +442,131 @@ export class WhatsappService {
     await this.usageService.recordSend(companyId, costCents);
   }
 
+  async sendImageMessage(
+    whatsappNumber: WhatsappNumber,
+    to: string,
+    imageUrl: string,
+    caption: string | undefined,
+    conversationId: string,
+    companyId: string,
+  ): Promise<void> {
+    const costCents = await this.usageService.costForMessage({ isBot: true });
+    await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
+
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const response = await axios.post(
+      `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'image',
+        image: { link: imageUrl, ...(caption ? { caption } : {}) },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const whatsappMessageId = response.data?.messages?.[0]?.id;
+
+    await this.conversationsService.saveMessage({
+      conversationId,
+      companyId,
+      direction: MessageDirection.OUTBOUND,
+      type: MessageType.IMAGE,
+      content: caption || '[Imagem]',
+      whatsappMessageId,
+      status: MessageStatus.SENT,
+      metadata: { imageUrl },
+      whatsappNumberId: whatsappNumber.id,
+      costCents,
+    });
+    await this.usageService.recordSend(companyId, costCents);
+  }
+
+  async sendBotInteractive(
+    whatsappNumber: WhatsappNumber,
+    to: string,
+    bodyText: string,
+    options: { label: string; value: string }[],
+    conversationId: string,
+    companyId: string,
+  ): Promise<void> {
+    const costCents = await this.usageService.costForMessage({ isBot: true });
+    await this.usageService.assertCanSend(whatsappNumber.id, companyId, costCents);
+
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
+    const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
+
+    const interactive =
+      options.length <= 3
+        ? {
+            type: 'button',
+            body: { text: bodyText },
+            action: {
+              buttons: options.map((o) => ({
+                type: 'reply',
+                reply: { id: o.value, title: o.label.slice(0, 20) },
+              })),
+            },
+          }
+        : {
+            type: 'list',
+            body: { text: bodyText },
+            action: {
+              button: 'Ver opções',
+              sections: [
+                {
+                  title: 'Opções',
+                  rows: options.map((o) => ({ id: o.value, title: o.label.slice(0, 24) })),
+                },
+              ],
+            },
+          };
+
+    const response = await axios.post(
+      `${apiUrl}/${whatsappNumber.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const whatsappMessageId = response.data?.messages?.[0]?.id;
+
+    await this.conversationsService.saveMessage({
+      conversationId,
+      companyId,
+      direction: MessageDirection.OUTBOUND,
+      type: MessageType.TEXT,
+      content: bodyText,
+      whatsappMessageId,
+      status: MessageStatus.SENT,
+      metadata: { interactive: true, options },
+      whatsappNumberId: whatsappNumber.id,
+      costCents,
+    });
+    await this.usageService.recordSend(companyId, costCents);
+  }
+
   async syncTemplates(id: string, companyId: string): Promise<{ synced: number }> {
     const whatsappNumber = await this.findById(id, companyId);
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     let response: any;
@@ -542,7 +642,7 @@ export class WhatsappService {
     }
 
     const whatsappNumber = await this.findById(id, companyId);
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const components: any[] = [];
@@ -619,7 +719,7 @@ export class WhatsappService {
     until: Date,
   ): Promise<{ byCategory: { category: string; costCents: number }[]; byCountry: { country: string; costCents: number }[]; totalCostCents: number }> {
     const whatsappNumber = await this.findById(id, companyId);
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const startUnix = Math.floor(since.getTime() / 1000);
@@ -740,7 +840,7 @@ export class WhatsappService {
     if (!whatsappNumberId) throw new BadRequestException('Número WhatsApp não identificado');
 
     const whatsappNumber = await this.findById(whatsappNumberId, companyId);
-    const accessToken = this.decrypt(whatsappNumber.accessToken);
+    const accessToken = decrypt(whatsappNumber.accessToken, this.configService);
     const apiUrl = this.configService.get<string>('WHATSAPP_API_URL');
 
     const metaRes = await axios.get(`${apiUrl}/${mediaId}`, {
@@ -760,5 +860,15 @@ export class WhatsappService {
   async getMediaStream(messageId: string, companyId: string): Promise<{ stream: any; mimeType: string }> {
     const result = await this.getMediaUrl(messageId, companyId);
     return { stream: result.stream, mimeType: result.mimeType };
+  }
+
+  createFlowSink(whatsappNumber: any, fromPhone: string, conversationId: string, companyId: string): FlowMessageSink {
+    return {
+      sendText: (text) => this.sendBotReply(whatsappNumber, fromPhone, text, conversationId, companyId),
+      sendChoice: (questionText, options) =>
+        this.sendBotInteractive(whatsappNumber, fromPhone, questionText, options, conversationId, companyId),
+      sendImage: (imageUrl, caption) =>
+        this.sendImageMessage(whatsappNumber, fromPhone, imageUrl, caption, conversationId, companyId),
+    };
   }
 }

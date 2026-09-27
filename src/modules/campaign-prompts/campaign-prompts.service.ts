@@ -5,9 +5,20 @@ import { CampaignPrompt } from './campaign-prompt.entity';
 import { PromptVersion } from './prompt-version.entity';
 import { Broadcast, BroadcastStatus } from '../broadcasts/broadcast.entity';
 import { AutomationRule } from '../automations/automation-rule.entity';
+import { AutomationExecution } from '../automations/automation-execution.entity';
+import { ConversationEvent, ConversationEventType } from '../conversations/conversation-event.entity';
 import { CreateCampaignPromptDto, UpdateCampaignPromptDto } from './dto/campaign-prompt.dto';
 
 const MAX_VERSIONS = 20;
+
+export interface PromptExecutionRow {
+  conversationId: string;
+  contactName: string;
+  contactPhone: string;
+  activatedAt: Date;
+  source: 'broadcast' | 'automation';
+  sourceLabel: string;
+}
 
 @Injectable()
 export class CampaignPromptsService {
@@ -20,7 +31,81 @@ export class CampaignPromptsService {
     private readonly broadcastRepo: Repository<Broadcast>,
     @InjectRepository(AutomationRule)
     private readonly automationRuleRepo: Repository<AutomationRule>,
+    @InjectRepository(AutomationExecution)
+    private readonly automationExecutionRepo: Repository<AutomationExecution>,
+    @InjectRepository(ConversationEvent)
+    private readonly eventRepo: Repository<ConversationEvent>,
   ) {}
+
+  async getExecutions(id: string, companyId: string): Promise<PromptExecutionRow[]> {
+    const prompt = await this.repo.findOne({ where: { id, companyId } });
+    if (!prompt) throw new NotFoundException('Prompt não encontrado');
+
+    const broadcasts = await this.broadcastRepo.find({ where: { campaignPromptId: id, companyId } });
+    const broadcastNameById = new Map(broadcasts.map((b) => [b.id, b.name]));
+    const broadcastIds = broadcasts.map((b) => b.id);
+
+    let broadcastRows: any[] = [];
+    if (broadcastIds.length) {
+      broadcastRows = await this.eventRepo
+        .createQueryBuilder('e')
+        .innerJoin('conversations', 'c', 'c.id = e."conversationId"')
+        .innerJoin('contacts', 'ct', 'ct.id = c."contactId"')
+        .where('e.type = :type', { type: ConversationEventType.CAMPAIGN_ACTIVATED })
+        .andWhere(`e.metadata->>'broadcastId' IN (:...broadcastIds)`, { broadcastIds })
+        .select([
+          'e."conversationId" as "conversationId"',
+          'e."createdAt" as "activatedAt"',
+          `e.metadata->>'broadcastId' as "broadcastId"`,
+          'ct.name as "contactName"',
+          'ct.phone as "contactPhone"',
+        ])
+        .getRawMany();
+    }
+
+    const rules = await this.automationRuleRepo.find({ where: { campaignPromptId: id, companyId } });
+    const ruleNameById = new Map(rules.map((r) => [r.id, r.name]));
+    const ruleIds = rules.map((r) => r.id);
+
+    let automationRows: any[] = [];
+    if (ruleIds.length) {
+      automationRows = await this.automationExecutionRepo
+        .createQueryBuilder('ae')
+        .innerJoin('contacts', 'ct', 'ct.id = ae."contactId"')
+        .where('ae."ruleId" IN (:...ruleIds)', { ruleIds })
+        .andWhere('ae."conversationId" IS NOT NULL')
+        .select([
+          'ae."conversationId" as "conversationId"',
+          'ae."createdAt" as "activatedAt"',
+          'ae."ruleId" as "ruleId"',
+          'ct.name as "contactName"',
+          'ct.phone as "contactPhone"',
+        ])
+        .getRawMany();
+    }
+
+    const rows: PromptExecutionRow[] = [
+      ...broadcastRows.map((r) => ({
+        conversationId: r.conversationId,
+        contactName: r.contactName,
+        contactPhone: r.contactPhone,
+        activatedAt: r.activatedAt,
+        source: 'broadcast' as const,
+        sourceLabel: broadcastNameById.get(r.broadcastId) ?? 'Broadcast',
+      })),
+      ...automationRows.map((r) => ({
+        conversationId: r.conversationId,
+        contactName: r.contactName,
+        contactPhone: r.contactPhone,
+        activatedAt: r.activatedAt,
+        source: 'automation' as const,
+        sourceLabel: ruleNameById.get(r.ruleId) ?? 'Automação',
+      })),
+    ];
+
+    rows.sort((a, b) => new Date(b.activatedAt).getTime() - new Date(a.activatedAt).getTime());
+    return rows.slice(0, 50);
+  }
 
   findAll(companyId: string): Promise<CampaignPrompt[]> {
     return this.repo.find({ where: { companyId }, order: { name: 'ASC' } });
