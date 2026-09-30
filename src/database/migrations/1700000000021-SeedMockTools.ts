@@ -1,8 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-// Aponta pro MockApiModule (src/modules/mock-api), que só é registrado fora de produção — não
-// faz sentido semear essas tools num banco de produção, então up() é pulado nesse ambiente.
-const MOCK_BASE_URL = 'http://localhost:3000/api/v1/mock';
+// Aponta pro MockApiModule (src/modules/mock-api) — endpoints fake pra demo/teste, registrados
+// em qualquer ambiente. A URL base vem de PUBLIC_API_URL pra funcionar em produção também.
+const MOCK_BASE_URL = `${process.env.PUBLIC_API_URL ?? 'http://localhost:3000'}/api/v1/mock`;
 
 const MOCK_TOOLS: {
   name: string;
@@ -74,31 +74,34 @@ export class SeedMockTools1700000000021 implements MigrationInterface {
   name = 'SeedMockTools1700000000021';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    if (process.env.NODE_ENV === 'production') return;
+    // Opt-in: sem DEMO_SEED_COMPANY_ID configurado, essa seed não faz nada — evita
+    // injetar tools fake de demonstração nas contas de clientes reais.
+    const companyId = process.env.DEMO_SEED_COMPANY_ID;
+    if (!companyId) return;
 
-    const companies: { id: string }[] = await queryRunner.query(`SELECT id FROM companies`);
-    for (const company of companies) {
-      for (const tool of MOCK_TOOLS) {
-        const exists = await queryRunner.query(
-          `SELECT 1 FROM external_actions WHERE "companyId" = $1 AND name = $2`,
-          [company.id, tool.name],
-        );
-        if (exists.length) continue;
+    const company = await queryRunner.query(`SELECT id FROM companies WHERE id = $1`, [companyId]);
+    if (!company.length) return;
 
-        await queryRunner.query(
-          `INSERT INTO external_actions
-            (id, "companyId", name, description, method, url, "parametersSchema", "bodyTemplate", "isActive", "timeoutMs", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid(), $1, $2, $3, 'GET'::"external_actions_method_enum", $4, $5::jsonb, $6::jsonb, true, 8000, now(), now())`,
-          [
-            company.id,
-            tool.name,
-            tool.description,
-            tool.url,
-            JSON.stringify(tool.parametersSchema),
-            tool.bodyTemplate ? JSON.stringify(tool.bodyTemplate) : null,
-          ],
-        );
-      }
+    for (const tool of MOCK_TOOLS) {
+      const exists = await queryRunner.query(
+        `SELECT 1 FROM external_actions WHERE "companyId" = $1 AND name = $2`,
+        [companyId, tool.name],
+      );
+      if (exists.length) continue;
+
+      await queryRunner.query(
+        `INSERT INTO external_actions
+          (id, "companyId", name, description, method, url, "parametersSchema", "bodyTemplate", "isActive", "timeoutMs", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid(), $1, $2, $3, 'GET'::"external_actions_method_enum", $4, $5::jsonb, $6::jsonb, true, 8000, now(), now())`,
+        [
+          companyId,
+          tool.name,
+          tool.description,
+          tool.url,
+          JSON.stringify(tool.parametersSchema),
+          tool.bodyTemplate ? JSON.stringify(tool.bodyTemplate) : null,
+        ],
+      );
     }
   }
 

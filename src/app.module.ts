@@ -52,6 +52,8 @@ import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-trigge
         WHATSAPP_API_URL: Joi.string().default('https://graph.facebook.com/v18.0'),
         ENCRYPTION_KEY: Joi.string().min(32).required(),
         OPENAI_API_KEY: Joi.string().required(),
+        PUBLIC_API_URL: Joi.string().default('http://localhost:3000'),
+        DEMO_SEED_COMPANY_ID: Joi.string().uuid().optional(),
       }),
     }),
 
@@ -107,8 +109,8 @@ import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-trigge
     ExternalActionsModule,
     FlowStepsModule,
     WebhookTriggersModule,
-    // Endpoints fake pra usar como Bot Tools em testes/demos — nunca em produção.
-    ...(process.env.NODE_ENV !== 'production' ? [MockApiModule] : []),
+    // Endpoints fake pra usar como Bot Tools em testes/demos com clientes.
+    MockApiModule,
   ],
   controllers: [HealthController],
 })
