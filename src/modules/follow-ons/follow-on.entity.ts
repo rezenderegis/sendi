@@ -1,5 +1,7 @@
 import { Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Contact } from '../contacts/contact.entity';
+import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 
 export enum FollowOnType {
   MEETING = 'meeting',
@@ -23,7 +25,18 @@ export class FollowOn {
   companyId: string;
 
   @Column()
-  conversationId: string;
+  contactId: string;
+
+  @ManyToOne(() => Contact, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'contactId' })
+  contact: Contact;
+
+  @Column({ nullable: true })
+  whatsappNumberId: string | null;
+
+  @ManyToOne(() => WhatsappNumber, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'whatsappNumberId' })
+  whatsappNumber: WhatsappNumber | null;
 
   @Column({ nullable: true })
   assignedUserId: string | null;

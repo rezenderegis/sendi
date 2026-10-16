@@ -32,12 +32,12 @@ export class FollowOnsController {
     return this.service.findAll(companyId, { userId, status });
   }
 
-  @Get('conversation/:conversationId')
-  findByConversation(
-    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+  @Get('contact/:contactId')
+  findByContact(
+    @Param('contactId', ParseUUIDPipe) contactId: string,
     @CurrentUser('companyId') companyId: string,
   ) {
-    return this.service.findByConversation(conversationId, companyId);
+    return this.service.findByContact(contactId, companyId);
   }
 
   @Patch(':id/complete')
@@ -54,6 +54,14 @@ export class FollowOnsController {
     @CurrentUser('companyId') companyId: string,
   ) {
     return this.service.reopen(id, companyId);
+  }
+
+  @Patch(':id/cancel')
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.cancel(id, companyId);
   }
 
   @Patch(':id')

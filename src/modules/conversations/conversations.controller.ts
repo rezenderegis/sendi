@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID, Allow } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ConversationsService } from './conversations.service';
 import { ConversationStatus } from './conversation.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -31,12 +31,6 @@ class UpdateConversationDto {
   @IsUUID()
   @IsOptional()
   assignedUserId?: string;
-
-  @ApiProperty({ required: false, nullable: true })
-  @IsUUID()
-  @IsOptional()
-  @Allow()
-  kanbanColumnId?: string | null;
 }
 
 class AddTagDto {
@@ -123,7 +117,6 @@ export class ConversationsController {
       companyId,
       dto.status,
       dto.assignedUserId,
-      dto.kanbanColumnId,
     );
   }
 

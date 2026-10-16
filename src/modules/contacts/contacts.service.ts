@@ -109,6 +109,38 @@ export class ContactsService {
     return contacts.map((c) => Object.assign(c, { conversationId: conversationByContact.get(c.id) ?? null }));
   }
 
+  async findForKanban(companyId: string): Promise<(Contact & { conversation: Conversation | null })[]> {
+    const contacts = await this.contactRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.tags', 'tags')
+      .where('c.companyId = :companyId', { companyId })
+      .andWhere(
+        '("c"."kanbanColumnId" IS NOT NULL OR EXISTS (SELECT 1 FROM conversations conv WHERE conv."contactId" = c.id))',
+      )
+      .getMany();
+
+    if (contacts.length === 0) return [];
+
+    // Conversa mais recente de cada contato, com os dados usados no card do Kanban.
+    const conversations = await this.conversationRepository
+      .createQueryBuilder('conv')
+      .leftJoinAndSelect('conv.whatsappNumber', 'whatsappNumber')
+      .leftJoinAndSelect('conv.assignedUser', 'assignedUser')
+      .leftJoinAndSelect('conv.tags', 'convTags')
+      .where('conv.contactId IN (:...ids)', { ids: contacts.map((c) => c.id) })
+      .orderBy('conv.lastMessageAt', 'DESC')
+      .getMany();
+
+    const conversationByContact = new Map<string, Conversation>();
+    for (const conv of conversations) {
+      if (!conversationByContact.has(conv.contactId)) {
+        conversationByContact.set(conv.contactId, conv);
+      }
+    }
+
+    return contacts.map((c) => Object.assign(c, { conversation: conversationByContact.get(c.id) ?? null }));
+  }
+
   async findById(id: string, companyId: string): Promise<Contact> {
     const contact = await this.contactRepository.findOne({
       where: { id, companyId },

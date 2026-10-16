@@ -3,7 +3,7 @@ import { FollowOnType } from '../follow-on.entity';
 
 export class CreateFollowOnDto {
   @IsUUID()
-  conversationId: string;
+  contactId: string;
 
   @IsEnum(FollowOnType)
   type: FollowOnType;
@@ -18,6 +18,11 @@ export class CreateFollowOnDto {
   @IsOptional()
   @IsUUID()
   assignedUserId?: string;
+
+  // obrigatório para type === 'message' (de qual número disparar)
+  @IsOptional()
+  @IsUUID()
+  whatsappNumberId?: string;
 
   // apenas para type === 'message'
   @IsOptional()
@@ -54,6 +59,10 @@ export class UpdateFollowOnDto {
   @IsOptional()
   @IsUUID()
   assignedUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  whatsappNumberId?: string;
 
   @IsOptional()
   @IsString()

@@ -51,6 +51,12 @@ export class ContactsController {
     return this.contactsService.findAll(companyId, broadcastId, broadcastResponseFilter);
   }
 
+  @Get('kanban')
+  @ApiOperation({ summary: 'Listar contatos para o board do Kanban (com raia definida ou conversa iniciada)' })
+  findForKanban(@CurrentUser('companyId') companyId: string) {
+    return this.contactsService.findForKanban(companyId);
+  }
+
   @Get('by-phone')
   @ApiOperation({ summary: 'Buscar contato por telefone' })
   findByPhone(

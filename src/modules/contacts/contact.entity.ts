@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Company } from '../companies/company.entity';
 import { Tag } from '../tags/tag.entity';
+import { KanbanColumn } from '../kanban-columns/kanban-column.entity';
 
 @Entity('contacts')
 export class Contact {
@@ -56,6 +57,13 @@ export class Contact {
 
   @Column({ default: false })
   automationOptOut: boolean;
+
+  @Column({ nullable: true })
+  kanbanColumnId: string | null;
+
+  @ManyToOne(() => KanbanColumn, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'kanbanColumnId' })
+  kanbanColumn: KanbanColumn | null;
 
   @CreateDateColumn()
   createdAt: Date;

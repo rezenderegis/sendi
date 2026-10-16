@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl, ValidateIf } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -46,6 +46,11 @@ export class CreateContactDto {
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;
+
+  @ApiPropertyOptional({ description: 'Raia do Kanban em que o lead já entra, sem precisar iniciar conversa' })
+  @IsUUID()
+  @IsOptional()
+  kanbanColumnId?: string;
 }
 
 export class UpdateContactDto {
@@ -99,4 +104,10 @@ export class UpdateContactDto {
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Raia do Kanban — envie null para tirar da raia (Sem raia)' })
+  @ValidateIf((o) => o.kanbanColumnId != null)
+  @IsUUID()
+  @IsOptional()
+  kanbanColumnId?: string | null;
 }

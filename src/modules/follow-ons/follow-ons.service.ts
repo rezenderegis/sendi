@@ -4,6 +4,7 @@ import { Repository, LessThanOrEqual, Not, In } from 'typeorm';
 import { FollowOn, FollowOnStatus, FollowOnType } from './follow-on.entity';
 import { AppNotification } from './notification.entity';
 import { CreateFollowOnDto, UpdateFollowOnDto } from './dto/follow-on.dto';
+import { Conversation } from '../conversations/conversation.entity';
 
 @Injectable()
 export class FollowOnsService {
@@ -12,11 +13,36 @@ export class FollowOnsService {
     private readonly repo: Repository<FollowOn>,
     @InjectRepository(AppNotification)
     private readonly notifRepo: Repository<AppNotification>,
+    @InjectRepository(Conversation)
+    private readonly conversationRepo: Repository<Conversation>,
   ) {}
 
+  private async attachLatestConversationId<T extends FollowOn>(followOns: T[]): Promise<(T & { conversationId: string | null })[]> {
+    if (!followOns.length) return [];
+    const contactIds = [...new Set(followOns.map((fo) => fo.contactId))];
+    const conversations = await this.conversationRepo
+      .createQueryBuilder('conv')
+      .select(['conv.id', 'conv.contactId'])
+      .where('conv.contactId IN (:...ids)', { ids: contactIds })
+      .orderBy('conv.lastMessageAt', 'DESC')
+      .getMany();
+
+    const byContact = new Map<string, string>();
+    for (const conv of conversations) {
+      if (!byContact.has(conv.contactId)) byContact.set(conv.contactId, conv.id);
+    }
+
+    return followOns.map((fo) => Object.assign(fo, { conversationId: byContact.get(fo.contactId) ?? null }));
+  }
+
   async create(companyId: string, createdByUserId: string, dto: CreateFollowOnDto): Promise<FollowOn> {
-    if (dto.type === FollowOnType.MESSAGE && !dto.message && !dto.templateName) {
-      throw new BadRequestException('Informe uma mensagem ou template para o tipo "Enviar mensagem"');
+    if (dto.type === FollowOnType.MESSAGE) {
+      if (!dto.message && !dto.templateName) {
+        throw new BadRequestException('Informe uma mensagem ou template para o tipo "Enviar mensagem"');
+      }
+      if (!dto.whatsappNumberId) {
+        throw new BadRequestException('Selecione de qual número de WhatsApp a mensagem será enviada');
+      }
     }
     const followOn = this.repo.create({
       ...dto,
@@ -27,23 +53,25 @@ export class FollowOnsService {
     return this.repo.save(followOn);
   }
 
-  findAll(companyId: string, filters: { userId?: string; status?: FollowOnStatus } = {}): Promise<FollowOn[]> {
+  async findAll(companyId: string, filters: { userId?: string; status?: FollowOnStatus } = {}) {
     const where: any = { companyId };
     if (filters.userId) where.assignedUserId = filters.userId;
     if (filters.status) where.status = filters.status;
-    return this.repo.find({
+    const followOns = await this.repo.find({
       where,
-      relations: ['assignedUser'],
+      relations: ['assignedUser', 'contact'],
       order: { scheduledAt: 'ASC' },
     });
+    return this.attachLatestConversationId(followOns);
   }
 
-  findByConversation(conversationId: string, companyId: string): Promise<FollowOn[]> {
-    return this.repo.find({
-      where: { conversationId, companyId },
+  async findByContact(contactId: string, companyId: string) {
+    const followOns = await this.repo.find({
+      where: { contactId, companyId },
       relations: ['assignedUser'],
-      order: { scheduledAt: 'ASC' },
+      order: { scheduledAt: 'DESC' },
     });
+    return this.attachLatestConversationId(followOns);
   }
 
   async complete(id: string, companyId: string): Promise<FollowOn> {
@@ -59,6 +87,13 @@ export class FollowOnsService {
     if (!followOn) throw new NotFoundException('Follow-on não encontrado');
     followOn.status = FollowOnStatus.PENDING;
     followOn.sentAt = null;
+    return this.repo.save(followOn);
+  }
+
+  async cancel(id: string, companyId: string): Promise<FollowOn> {
+    const followOn = await this.repo.findOne({ where: { id, companyId } });
+    if (!followOn) throw new NotFoundException('Follow-on não encontrado');
+    followOn.status = FollowOnStatus.CANCELLED;
     return this.repo.save(followOn);
   }
 
@@ -102,6 +137,7 @@ export class FollowOnsService {
     title: string;
     body?: string;
     conversationId?: string;
+    contactId?: string;
     followOnId?: string;
   }): Promise<void> {
     await this.notifRepo.save(this.notifRepo.create(data));

@@ -16,7 +16,6 @@ import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { User } from '../users/user.entity';
 import { Message } from './message.entity';
 import { Tag } from '../tags/tag.entity';
-import { KanbanColumn } from '../kanban-columns/kanban-column.entity';
 
 export enum ConversationStatus {
   OPEN = 'open',
@@ -94,13 +93,6 @@ export class Conversation {
 
   @Column({ type: 'jsonb', nullable: true })
   variables: Record<string, any> | null;
-
-  @Column({ nullable: true })
-  kanbanColumnId: string | null;
-
-  @ManyToOne(() => KanbanColumn, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'kanbanColumnId' })
-  kanbanColumn: KanbanColumn | null;
 
   @CreateDateColumn()
   createdAt: Date;

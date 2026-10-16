@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FollowOnsService } from './follow-ons.service';
 import { FollowOnType } from './follow-on.entity';
-import { Conversation } from '../conversations/conversation.entity';
+import { Contact } from '../contacts/contact.entity';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { User } from '../users/user.entity';
 
@@ -15,8 +15,8 @@ export class FollowOnsCronService {
   constructor(
     private readonly followOnsService: FollowOnsService,
     private readonly whatsappService: WhatsappService,
-    @InjectRepository(Conversation)
-    private readonly conversationRepo: Repository<Conversation>,
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
@@ -37,17 +37,14 @@ export class FollowOnsCronService {
           message_manual: 'Lembrete de mensagem',
         };
 
-        if (fo.type === FollowOnType.MESSAGE) {
-          const conv = await this.conversationRepo.findOne({
-            where: { id: fo.conversationId },
-            relations: ['contact', 'whatsappNumber'],
-          });
+        const contact = await this.contactRepo.findOne({ where: { id: fo.contactId } });
 
-          if (conv?.contact && conv.whatsappNumber) {
+        if (fo.type === FollowOnType.MESSAGE) {
+          if (contact && fo.whatsappNumberId) {
             if (fo.templateName) {
               await this.whatsappService.sendMessage(fo.companyId, {
-                whatsappNumberId: conv.whatsappNumberId,
-                to: conv.contact.phone,
+                whatsappNumberId: fo.whatsappNumberId,
+                to: contact.phone,
                 type: 'template',
                 templateName: fo.templateName,
                 templateLanguage: fo.templateLanguage ?? 'pt_BR',
@@ -55,12 +52,14 @@ export class FollowOnsCronService {
               });
             } else if (fo.message) {
               await this.whatsappService.sendMessage(fo.companyId, {
-                whatsappNumberId: conv.whatsappNumberId,
-                to: conv.contact.phone,
+                whatsappNumberId: fo.whatsappNumberId,
+                to: contact.phone,
                 type: 'text',
                 message: fo.message,
               });
             }
+          } else {
+            this.logger.warn(`Follow-on ${fo.id} do tipo "message" sem contato ou número de WhatsApp — não enviado`);
           }
         }
 
@@ -69,18 +68,14 @@ export class FollowOnsCronService {
         // Notificar atendente responsável
         const targetUserId = fo.assignedUserId;
         if (targetUserId) {
-          const conv = await this.conversationRepo.findOne({
-            where: { id: fo.conversationId },
-            relations: ['contact'],
-          });
-          const contactName = conv?.contact?.name ?? 'Contato';
+          const contactName = contact?.name ?? 'Contato';
           const label = typeLabels[fo.type] ?? fo.type;
           await this.followOnsService.createNotification({
             companyId: fo.companyId,
             userId: targetUserId,
             title: `Follow-on: ${label}`,
             body: fo.note ? `${contactName} · ${fo.note}` : contactName,
-            conversationId: fo.conversationId,
+            contactId: fo.contactId,
             followOnId: fo.id,
           });
         }

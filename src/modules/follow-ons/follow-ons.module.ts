@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FollowOn } from './follow-on.entity';
 import { AppNotification } from './notification.entity';
+import { Contact } from '../contacts/contact.entity';
 import { Conversation } from '../conversations/conversation.entity';
 import { User } from '../users/user.entity';
 import { FollowOnsService } from './follow-ons.service';
@@ -12,7 +13,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FollowOn, AppNotification, Conversation, User]),
+    TypeOrmModule.forFeature([FollowOn, AppNotification, Contact, Conversation, User]),
     ScheduleModule.forRoot(),
     WhatsappModule,
   ],

@@ -21,6 +21,9 @@ export class AppNotification {
   conversationId: string | null;
 
   @Column({ nullable: true })
+  contactId: string | null;
+
+  @Column({ nullable: true })
   followOnId: string | null;
 
   @Column({ nullable: true })
