@@ -44,11 +44,19 @@ export class FollowOnsService {
         throw new BadRequestException('Selecione de qual número de WhatsApp a mensagem será enviada');
       }
     }
+    if (dto.type === FollowOnType.NOTE && !dto.note?.trim()) {
+      throw new BadRequestException('Informe o texto da anotação');
+    }
+
+    // Nota não é uma atividade pendente — é um registro já concluído na
+    // hora da criação, não entra no ciclo de agendamento/cron.
+    const isNote = dto.type === FollowOnType.NOTE;
     const followOn = this.repo.create({
       ...dto,
       companyId,
       assignedUserId: dto.assignedUserId ?? createdByUserId,
-      scheduledAt: new Date(dto.scheduledAt),
+      scheduledAt: isNote ? new Date() : new Date(dto.scheduledAt),
+      ...(isNote ? { status: FollowOnStatus.DONE, sentAt: new Date() } : {}),
     });
     return this.repo.save(followOn);
   }

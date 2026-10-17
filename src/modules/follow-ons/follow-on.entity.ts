@@ -8,6 +8,9 @@ export enum FollowOnType {
   CALL = 'call',
   MESSAGE = 'message',
   MESSAGE_MANUAL = 'message_manual',
+  // Registro instantâneo (sem pendência) — diferente das atividades acima,
+  // que seguem o ciclo pending → done/cancelled.
+  NOTE = 'note',
 }
 
 export enum FollowOnStatus {

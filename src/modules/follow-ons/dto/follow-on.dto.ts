@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, IsArray } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, IsArray, ValidateIf } from 'class-validator';
 import { FollowOnType } from '../follow-on.entity';
 
 export class CreateFollowOnDto {
@@ -8,6 +8,9 @@ export class CreateFollowOnDto {
   @IsEnum(FollowOnType)
   type: FollowOnType;
 
+  // Para type "note" o backend ignora o valor enviado e usa a hora atual
+  // (é um registro instantâneo, não um agendamento) — por isso é opcional aqui.
+  @ValidateIf((o) => o.type !== FollowOnType.NOTE)
   @IsDateString()
   scheduledAt: string;
 
