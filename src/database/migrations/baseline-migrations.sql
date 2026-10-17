@@ -4,6 +4,14 @@
 -- Rodar UMA VEZ no banco novo, antes do primeiro "migration:run" por lá.
 -- Idempotente: pode rodar de novo sem duplicar (ON CONFLICT faz nada).
 
+-- O dump/restore trouxe as tabelas da aplicação mas não a tabela de
+-- controle do TypeORM — cria ela com a mesma estrutura que ele usa.
+CREATE TABLE IF NOT EXISTS migrations (
+  id SERIAL PRIMARY KEY,
+  timestamp bigint NOT NULL,
+  name character varying NOT NULL
+);
+
 INSERT INTO migrations (timestamp, name) VALUES
   (1700000000000, 'InitialSchema1700000000000'),
   (1700000000001, 'TagsSchema1700000000001'),
