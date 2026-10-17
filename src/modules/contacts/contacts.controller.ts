@@ -19,7 +19,7 @@ import { IsBoolean, IsUUID } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ContactsService } from './contacts.service';
-import { CreateContactDto, UpdateContactDto } from './dto/create-contact.dto';
+import { CreateContactDto, MarkLostDto, UpdateContactDto } from './dto/create-contact.dto';
 
 class AutomationOptOutDto {
   @IsBoolean()
@@ -53,8 +53,20 @@ export class ContactsController {
 
   @Get('kanban')
   @ApiOperation({ summary: 'Listar contatos para o board do Kanban (com raia definida ou conversa iniciada)' })
-  findForKanban(@CurrentUser('companyId') companyId: string) {
-    return this.contactsService.findForKanban(companyId);
+  findForKanban(
+    @CurrentUser('companyId') companyId: string,
+    @Query('status') status?: 'active' | 'lost' | 'all',
+  ) {
+    return this.contactsService.findForKanban(companyId, status ?? 'active');
+  }
+
+  @Get('funnel')
+  @ApiOperation({ summary: 'Relatório de funil de conversão do Kanban' })
+  getFunnel(
+    @CurrentUser('companyId') companyId: string,
+    @Query('days') days?: string,
+  ) {
+    return this.contactsService.getFunnel(companyId, Number(days) || 30);
   }
 
   @Get('by-phone')
@@ -83,6 +95,25 @@ export class ContactsController {
     @Body() dto: UpdateContactDto,
   ) {
     return this.contactsService.update(id, companyId, dto);
+  }
+
+  @Patch(':id/lost')
+  @ApiOperation({ summary: 'Marcar lead como perdido, com motivo' })
+  markLost(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: MarkLostDto,
+  ) {
+    return this.contactsService.markLost(id, companyId, dto.reason);
+  }
+
+  @Patch(':id/reopen')
+  @ApiOperation({ summary: 'Reabrir um lead marcado como perdido' })
+  reopen(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.contactsService.reopen(id, companyId);
   }
 
   @Get('by-tag/:tagId')

@@ -12,6 +12,7 @@ import {
 import { Company } from '../companies/company.entity';
 import { Tag } from '../tags/tag.entity';
 import { KanbanColumn } from '../kanban-columns/kanban-column.entity';
+import { User } from '../users/user.entity';
 
 @Entity('contacts')
 export class Contact {
@@ -64,6 +65,28 @@ export class Contact {
   @ManyToOne(() => KanbanColumn, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'kanbanColumnId' })
   kanbanColumn: KanbanColumn | null;
+
+  // Carimbado só quando kanbanColumnId muda de verdade (não em qualquer
+  // edição) — base real pro indicador de "lead parado".
+  @Column({ type: 'timestamptz', nullable: true })
+  kanbanColumnChangedAt: Date | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  dealValue: number | null;
+
+  @Column({ nullable: true })
+  dealOwnerId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'dealOwnerId' })
+  dealOwner: User | null;
+
+  // "Perdido" é simplesmente lostAt != null — sem enum de status separado.
+  @Column({ type: 'timestamptz', nullable: true })
+  lostAt: Date | null;
+
+  @Column({ nullable: true })
+  lostReason: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

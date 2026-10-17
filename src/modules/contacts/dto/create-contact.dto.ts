@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateIf } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -51,6 +51,16 @@ export class CreateContactDto {
   @IsUUID()
   @IsOptional()
   kanbanColumnId?: string;
+
+  @ApiPropertyOptional({ description: 'Valor estimado do negócio' })
+  @IsNumber()
+  @IsOptional()
+  dealValue?: number;
+
+  @ApiPropertyOptional({ description: 'Usuário dono do negócio' })
+  @IsUUID()
+  @IsOptional()
+  dealOwnerId?: string;
 }
 
 export class UpdateContactDto {
@@ -110,4 +120,23 @@ export class UpdateContactDto {
   @IsUUID()
   @IsOptional()
   kanbanColumnId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Valor estimado do negócio' })
+  @ValidateIf((o) => o.dealValue != null)
+  @IsNumber()
+  @IsOptional()
+  dealValue?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Usuário dono do negócio' })
+  @ValidateIf((o) => o.dealOwnerId != null)
+  @IsUUID()
+  @IsOptional()
+  dealOwnerId?: string | null;
+}
+
+export class MarkLostDto {
+  @ApiProperty({ example: 'Preço alto' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }
