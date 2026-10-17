@@ -55,6 +55,11 @@ export class FollowOn {
   scheduledAt: Date;
 
   @Column({ nullable: true })
+  title: string | null;
+
+  // Descrição/resultado da atividade — mantém o nome de coluna "note" por
+  // compatibilidade com dados já existentes, mas na UI aparece como "Descrição".
+  @Column({ nullable: true })
   note: string | null;
 
   @Column({ type: 'text', nullable: true })

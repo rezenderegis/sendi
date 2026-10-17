@@ -16,6 +16,10 @@ export class CreateFollowOnDto {
 
   @IsOptional()
   @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
   note?: string;
 
   @IsOptional()
@@ -54,6 +58,10 @@ export class UpdateFollowOnDto {
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
 
   @IsOptional()
   @IsString()
