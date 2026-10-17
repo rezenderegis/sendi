@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from './contact.entity';
@@ -203,6 +203,14 @@ export class ContactsService {
   }
 
   async create(companyId: string, dto: CreateContactDto): Promise<Contact> {
+    const existing = await this.findByPhone(dto.phone, companyId);
+    if (existing) {
+      throw new ConflictException({
+        message: 'Já existe um contato com esse telefone',
+        contactId: existing.id,
+      });
+    }
+
     const contact = this.contactRepository.create({
       ...dto,
       phone: normalizePhone(dto.phone),
