@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../users/user.entity';
 import { Company, CompanyPlan } from '../companies/company.entity';
+import { ActivityType, DEFAULT_ACTIVITY_TYPE_NAMES } from '../teams/activity-type.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -19,6 +20,8 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
+    @InjectRepository(ActivityType)
+    private readonly activityTypeRepository: Repository<ActivityType>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -43,6 +46,13 @@ export class AuthService {
       plan: CompanyPlan.FREE,
     });
     const savedCompany = await this.companyRepository.save(company);
+
+    // Semeia os tipos de atividade padrão pra toda empresa nova (Tarefa,
+    // Reunião, Visita presencial, Reunião presencial), usados nas Metas de
+    // produtividade — mesmos nomes da migration 1700000000035.
+    await this.activityTypeRepository.save(
+      DEFAULT_ACTIVITY_TYPE_NAMES.map((name) => this.activityTypeRepository.create({ companyId: savedCompany.id, name })),
+    );
 
     const user = this.userRepository.create({
       name: dto.userName,

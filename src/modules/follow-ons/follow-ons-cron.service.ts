@@ -42,7 +42,7 @@ export class FollowOnsCronService {
         if (fo.type === FollowOnType.MESSAGE) {
           if (contact && fo.whatsappNumberId) {
             if (fo.templateName) {
-              await this.whatsappService.sendMessage(fo.companyId, {
+              await this.whatsappService.sendMessage(fo.companyId, null, {
                 whatsappNumberId: fo.whatsappNumberId,
                 to: contact.phone,
                 type: 'template',
@@ -51,7 +51,7 @@ export class FollowOnsCronService {
                 templateVariables: fo.templateVariables ?? undefined,
               });
             } else if (fo.message) {
-              await this.whatsappService.sendMessage(fo.companyId, {
+              await this.whatsappService.sendMessage(fo.companyId, null, {
                 whatsappNumberId: fo.whatsappNumberId,
                 to: contact.phone,
                 type: 'text',

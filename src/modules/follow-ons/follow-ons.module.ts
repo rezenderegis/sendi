@@ -6,6 +6,7 @@ import { AppNotification } from './notification.entity';
 import { Contact } from '../contacts/contact.entity';
 import { Conversation } from '../conversations/conversation.entity';
 import { User } from '../users/user.entity';
+import { ActivityType } from '../teams/activity-type.entity';
 import { FollowOnsService } from './follow-ons.service';
 import { FollowOnsCronService } from './follow-ons-cron.service';
 import { FollowOnsController, NotificationsController } from './follow-ons.controller';
@@ -13,7 +14,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FollowOn, AppNotification, Contact, Conversation, User]),
+    TypeOrmModule.forFeature([FollowOn, AppNotification, Contact, Conversation, User, ActivityType]),
     ScheduleModule.forRoot(),
     WhatsappModule,
   ],

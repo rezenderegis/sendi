@@ -99,7 +99,7 @@ export class WebhookTriggersService {
         const mensagemResolvida = dto.mensagem
           ? this.flowEngine.resolveTemplate(dto.mensagem, this.flowEngine.buildToolContext(contact, { id: null, variables: null }))
           : undefined;
-        await this.whatsappService.sendMessage(companyId, {
+        await this.whatsappService.sendMessage(companyId, null, {
           to: dto.phone,
           whatsappNumberId,
           type: dto.template ? 'template' : 'text',

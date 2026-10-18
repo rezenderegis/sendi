@@ -82,9 +82,10 @@ export class ContactsController {
   @ApiOperation({ summary: 'Criar contato' })
   create(
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: CreateContactDto,
   ) {
-    return this.contactsService.create(companyId, dto);
+    return this.contactsService.create(companyId, userId, dto);
   }
 
   @Patch(':id')

@@ -334,7 +334,7 @@ export class AutomationsService {
     })() : undefined;
 
     try {
-      const result = await this.whatsappService.sendMessage(rule.companyId, {
+      const result = await this.whatsappService.sendMessage(rule.companyId, null, {
         whatsappNumberId: rule.whatsappNumberId,
         to: contact.phone,
         type: isTemplate ? 'template' : 'text',
@@ -382,7 +382,7 @@ export class AutomationsService {
     let conversationId: string | null = null;
 
     try {
-      const result = await this.whatsappService.sendMessage(rule.companyId, {
+      const result = await this.whatsappService.sendMessage(rule.companyId, null, {
         whatsappNumberId: rule.whatsappNumberId,
         to: contact.phone,
         type: isTemplate ? 'template' : 'text',

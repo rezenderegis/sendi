@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Company } from '../companies/company.entity';
+import { Team } from '../teams/team.entity';
 
 export enum UserRole {
   OWNER = 'owner',
@@ -59,6 +60,13 @@ export class User {
   // Incrementado para invalidar todos os tokens já emitidos (ex: aparelho perdido)
   @Column({ default: 0 })
   tokenVersion: number;
+
+  @Column({ nullable: true })
+  teamId: string | null;
+
+  @ManyToOne(() => Team, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'teamId' })
+  team: Team | null;
 
   @BeforeInsert()
   async hashPassword() {

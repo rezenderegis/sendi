@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToO
 import { User } from '../users/user.entity';
 import { Contact } from '../contacts/contact.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
+import { ActivityType } from '../teams/activity-type.entity';
 
 export enum FollowOnType {
   MEETING = 'meeting',
@@ -50,6 +51,15 @@ export class FollowOn {
 
   @Column({ type: 'enum', enum: FollowOnType })
   type: FollowOnType;
+
+  // Tipo de atividade pra fins de meta de produtividade — independente do
+  // "type" acima (que só rege comportamento: envio de mensagem, nota instantânea).
+  @Column({ nullable: true })
+  activityTypeId: string | null;
+
+  @ManyToOne(() => ActivityType, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'activityTypeId' })
+  activityType: ActivityType | null;
 
   @Column({ type: 'timestamptz' })
   scheduledAt: Date;

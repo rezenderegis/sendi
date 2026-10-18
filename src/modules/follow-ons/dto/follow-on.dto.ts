@@ -26,6 +26,13 @@ export class CreateFollowOnDto {
   @IsUUID()
   assignedUserId?: string;
 
+  // Tipo de atividade pra fins de meta de produtividade (Tarefa/Reunião/Visita
+  // presencial/etc) — independente do "type" acima. Se não vier, o backend
+  // resolve um padrão a partir do "type".
+  @IsOptional()
+  @IsUUID()
+  activityTypeId?: string;
+
   // obrigatório para type === 'message' (de qual número disparar)
   @IsOptional()
   @IsUUID()
@@ -70,6 +77,10 @@ export class UpdateFollowOnDto {
   @IsOptional()
   @IsUUID()
   assignedUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  activityTypeId?: string;
 
   @IsOptional()
   @IsUUID()

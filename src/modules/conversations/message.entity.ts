@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Conversation } from './conversation.entity';
 import { Company } from '../companies/company.entity';
+import { User } from '../users/user.entity';
 
 export enum MessageDirection {
   INBOUND = 'inbound',
@@ -82,6 +83,17 @@ export class Message {
 
   @Column({ nullable: true })
   deliveredAt: Date;
+
+  // Usado só pra métrica de "mensagem de follow-up" das Metas de produtividade —
+  // setado só nos envios manuais feitos por um usuário (sendMessage/sendAudioMessage).
+  // Respostas do bot, mensagens de entrada e disparos de broadcast ficam null:
+  // disparo em massa não é o esforço individual que essa métrica quer medir.
+  @Column({ nullable: true })
+  sentByUserId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'sentByUserId' })
+  sentByUser: User | null;
 
   @Column({ nullable: true })
   readAt: Date;

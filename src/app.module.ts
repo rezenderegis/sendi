@@ -29,6 +29,7 @@ import { ExternalActionsModule } from './modules/external-actions/external-actio
 import { FlowStepsModule } from './modules/flow-steps/flow-steps.module';
 import { MockApiModule } from './modules/mock-api/mock-api.module';
 import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-triggers.module';
+import { TeamsModule } from './modules/teams/teams.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-trigge
     ExternalActionsModule,
     FlowStepsModule,
     WebhookTriggersModule,
+    TeamsModule,
     // Endpoints fake pra usar como Bot Tools em testes/demos com clientes.
     MockApiModule,
   ],

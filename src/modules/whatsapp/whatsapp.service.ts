@@ -104,7 +104,7 @@ export class WhatsappService {
     await this.whatsappNumberRepository.save(number);
   }
 
-  async sendMessage(companyId: string, dto: SendMessageDto): Promise<any> {
+  async sendMessage(companyId: string, sentByUserId: string | null, dto: SendMessageDto): Promise<any> {
     const whatsappNumber = await this.findById(dto.whatsappNumberId, companyId);
     const isTemplate = dto.type === 'template';
 
@@ -272,6 +272,7 @@ export class WhatsappService {
       metadata: dto.broadcastRecipientId ? { broadcastRecipientId: dto.broadcastRecipientId } : undefined,
       whatsappNumberId: whatsappNumber.id,
       costCents,
+      sentByUserId,
     });
     await this.usageService.recordSend(companyId, costCents);
 
@@ -295,6 +296,7 @@ export class WhatsappService {
 
   async sendAudioMessage(
     companyId: string,
+    sentByUserId: string,
     whatsappNumberId: string,
     to: string,
     audioBuffer: Buffer,
@@ -357,6 +359,7 @@ export class WhatsappService {
       status: MessageStatus.SENT,
       whatsappNumberId: whatsappNumber.id,
       costCents,
+      sentByUserId,
       metadata: {
         raw: { audio: { id: mediaId } },
         mimeType,

@@ -62,7 +62,7 @@ export class BroadcastProcessor {
         return d;
       })() : undefined;
 
-      const { conversationId } = await this.whatsappService.sendMessage(broadcast.companyId, {
+      const { conversationId } = await this.whatsappService.sendMessage(broadcast.companyId, null, {
         whatsappNumberId: broadcast.whatsappNumberId,
         to: recipient.contact.phone,
         type: broadcast.type === BroadcastType.TEMPLATE ? 'template' : 'text',

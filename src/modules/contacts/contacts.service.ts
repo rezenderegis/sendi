@@ -216,7 +216,7 @@ export class ContactsService {
     return contact;
   }
 
-  async create(companyId: string, dto: CreateContactDto): Promise<Contact> {
+  async create(companyId: string, createdByUserId: string, dto: CreateContactDto): Promise<Contact> {
     const existing = await this.findByPhone(dto.phone, companyId);
     if (existing) {
       throw new ConflictException({
@@ -229,6 +229,7 @@ export class ContactsService {
       ...dto,
       phone: normalizePhone(dto.phone),
       companyId,
+      createdByUserId,
     });
     return this.contactRepository.save(contact);
   }

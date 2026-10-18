@@ -88,6 +88,16 @@ export class Contact {
   @Column({ nullable: true })
   lostReason: string | null;
 
+  // Usado só pra métrica de "contato cadastrado" das Metas de produtividade —
+  // só é setado quando o contato é criado via POST /contacts explícito;
+  // contatos criados por webhook/automação (findOrCreateByPhone) ficam null.
+  @Column({ nullable: true })
+  createdByUserId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'createdByUserId' })
+  createdByUser: User | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

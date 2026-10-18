@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { User } from '../users/user.entity';
 import { Company } from '../companies/company.entity';
+import { ActivityType } from '../teams/activity-type.entity';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { Company } from '../companies/company.entity';
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') },
       }),
     }),
-    TypeOrmModule.forFeature([User, Company]),
+    TypeOrmModule.forFeature([User, Company, ActivityType]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

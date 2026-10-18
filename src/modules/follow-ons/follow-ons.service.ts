@@ -5,6 +5,7 @@ import { FollowOn, FollowOnStatus, FollowOnType } from './follow-on.entity';
 import { AppNotification } from './notification.entity';
 import { CreateFollowOnDto, UpdateFollowOnDto } from './dto/follow-on.dto';
 import { Conversation } from '../conversations/conversation.entity';
+import { ActivityType, DEFAULT_ACTIVITY_TYPE_NAMES } from '../teams/activity-type.entity';
 
 @Injectable()
 export class FollowOnsService {
@@ -15,7 +16,18 @@ export class FollowOnsService {
     private readonly notifRepo: Repository<AppNotification>,
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
+    @InjectRepository(ActivityType)
+    private readonly activityTypeRepo: Repository<ActivityType>,
   ) {}
+
+  // Quando activityTypeId não vem explícito, resolve um padrão a partir do
+  // "type" técnico (reunião -> "Reunião", qualquer outro -> "Tarefa"). Se o
+  // nome não existir mais na empresa (renomeado/excluído), fica null sem erro.
+  private async resolveDefaultActivityTypeId(companyId: string, type: FollowOnType): Promise<string | null> {
+    const name = type === FollowOnType.MEETING ? DEFAULT_ACTIVITY_TYPE_NAMES[1] : DEFAULT_ACTIVITY_TYPE_NAMES[0];
+    const activityType = await this.activityTypeRepo.findOne({ where: { companyId, name } });
+    return activityType?.id ?? null;
+  }
 
   private async attachLatestConversationId<T extends FollowOn>(followOns: T[]): Promise<(T & { conversationId: string | null })[]> {
     if (!followOns.length) return [];
@@ -51,10 +63,12 @@ export class FollowOnsService {
     // Nota não é uma atividade pendente — é um registro já concluído na
     // hora da criação, não entra no ciclo de agendamento/cron.
     const isNote = dto.type === FollowOnType.NOTE;
+    const activityTypeId = dto.activityTypeId ?? (await this.resolveDefaultActivityTypeId(companyId, dto.type));
     const followOn = this.repo.create({
       ...dto,
       companyId,
       assignedUserId: dto.assignedUserId ?? createdByUserId,
+      activityTypeId,
       scheduledAt: isNote ? new Date() : new Date(dto.scheduledAt),
       ...(isNote ? { status: FollowOnStatus.DONE, sentAt: new Date() } : {}),
     });

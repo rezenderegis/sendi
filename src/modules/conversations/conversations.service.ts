@@ -229,6 +229,7 @@ export class ConversationsService {
     aiPromptSource?: string;
     whatsappNumberId?: string;
     costCents?: number;
+    sentByUserId?: string | null;
   }): Promise<Message> {
     const message = this.messageRepository.create({
       ...data,

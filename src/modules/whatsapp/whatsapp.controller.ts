@@ -124,9 +124,10 @@ export class WhatsappController {
   @ApiOperation({ summary: 'Enviar mensagem de texto' })
   sendMessage(
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: SendMessageDto,
   ) {
-    return this.whatsappService.sendMessage(companyId, dto);
+    return this.whatsappService.sendMessage(companyId, userId, dto);
   }
 
   @Post('messages/send-audio')
@@ -134,6 +135,7 @@ export class WhatsappController {
   @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 16 * 1024 * 1024 } }))
   async sendAudio(
     @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('whatsappNumberId') whatsappNumberId: string,
     @Body('to') to: string,
@@ -142,6 +144,7 @@ export class WhatsappController {
     if (!whatsappNumberId || !to) throw new BadRequestException('whatsappNumberId e to são obrigatórios');
     return this.whatsappService.sendAudioMessage(
       companyId,
+      userId,
       whatsappNumberId,
       to,
       file.buffer,
