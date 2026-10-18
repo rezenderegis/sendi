@@ -30,6 +30,7 @@ import { FlowStepsModule } from './modules/flow-steps/flow-steps.module';
 import { MockApiModule } from './modules/mock-api/mock-api.module';
 import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-triggers.module';
 import { TeamsModule } from './modules/teams/teams.module';
+import { DealsModule } from './modules/deals/deals.module';
 
 @Module({
   imports: [
@@ -111,6 +112,7 @@ import { TeamsModule } from './modules/teams/teams.module';
     FlowStepsModule,
     WebhookTriggersModule,
     TeamsModule,
+    DealsModule,
     // Endpoints fake pra usar como Bot Tools em testes/demos com clientes.
     MockApiModule,
   ],
