@@ -21,7 +21,7 @@ export class FollowOnActivityType1700000000036 implements MigrationInterface {
       UPDATE "follow_ons" f
       SET "activityTypeId" = at."id"
       FROM "activity_types" at
-      WHERE at."companyId" = f."companyId"
+      WHERE at."companyId"::text = f."companyId"
         AND at."name" = CASE WHEN f."type" = 'meeting' THEN 'Reunião' ELSE 'Tarefa' END
         AND f."activityTypeId" IS NULL
     `);

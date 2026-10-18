@@ -23,7 +23,7 @@ export class ProductivityGoalActivityType1700000000037 implements MigrationInter
       UPDATE "productivity_goals" pg
       SET "activityTypeId" = at."id", metric = 'activity'
       FROM "activity_types" at
-      WHERE at."companyId" = pg."companyId"
+      WHERE at."companyId"::text = pg."companyId"
         AND (
           (pg.metric = 'tasks_completed' AND at."name" = 'Tarefa')
           OR (pg.metric = 'meetings_held' AND at."name" = 'Reunião')
