@@ -5,6 +5,12 @@ export class CreateFollowOnDto {
   @IsUUID()
   contactId: string;
 
+  // Opcional — vem preenchido quando a criação parte da tela de um negócio
+  // específico; fica de fora quando parte da tela de conversa solta.
+  @IsOptional()
+  @IsUUID()
+  dealId?: string;
+
   @IsEnum(FollowOnType)
   type: FollowOnType;
 

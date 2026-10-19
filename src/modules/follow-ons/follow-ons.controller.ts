@@ -40,6 +40,14 @@ export class FollowOnsController {
     return this.service.findByContact(contactId, companyId);
   }
 
+  @Get('deal/:dealId')
+  findByDeal(
+    @Param('dealId', ParseUUIDPipe) dealId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.service.findByDeal(dealId, companyId);
+  }
+
   @Patch(':id/complete')
   complete(
     @Param('id', ParseUUIDPipe) id: string,

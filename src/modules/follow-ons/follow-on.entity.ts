@@ -3,6 +3,7 @@ import { User } from '../users/user.entity';
 import { Contact } from '../contacts/contact.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { ActivityType } from '../teams/activity-type.entity';
+import { Deal } from '../deals/deal.entity';
 
 export enum FollowOnType {
   MEETING = 'meeting',
@@ -34,6 +35,15 @@ export class FollowOn {
   @ManyToOne(() => Contact, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'contactId' })
   contact: Contact;
+
+  // Opcional: null quando criado pela tela de conversa solta (sem negócio no
+  // contexto) — nesses casos o item só aparece na visão "histórico do contato".
+  @Column({ nullable: true })
+  dealId: string | null;
+
+  @ManyToOne(() => Deal, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'dealId' })
+  deal: Deal | null;
 
   @Column({ nullable: true })
   whatsappNumberId: string | null;

@@ -96,6 +96,17 @@ export class FollowOnsService {
     return this.attachLatestConversationId(followOns);
   }
 
+  // Histórico restrito a um negócio — usado pela tela de detalhe do negócio,
+  // pra não misturar atividades de outro negócio do mesmo contato.
+  async findByDeal(dealId: string, companyId: string) {
+    const followOns = await this.repo.find({
+      where: { dealId, companyId },
+      relations: ['assignedUser'],
+      order: { scheduledAt: 'DESC' },
+    });
+    return this.attachLatestConversationId(followOns);
+  }
+
   async complete(id: string, companyId: string): Promise<FollowOn> {
     const followOn = await this.repo.findOne({ where: { id, companyId } });
     if (!followOn) throw new NotFoundException('Follow-on não encontrado');
