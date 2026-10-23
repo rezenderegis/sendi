@@ -31,6 +31,7 @@ import { MockApiModule } from './modules/mock-api/mock-api.module';
 import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-triggers.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { DealsModule } from './modules/deals/deals.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { DealsModule } from './modules/deals/deals.module';
         OPENAI_API_KEY: Joi.string().required(),
         PUBLIC_API_URL: Joi.string().default('http://localhost:3000'),
         DEMO_SEED_COMPANY_ID: Joi.string().uuid().optional(),
+        FIREBASE_SERVICE_ACCOUNT_JSON: Joi.string().optional(),
       }),
     }),
 
@@ -113,6 +115,7 @@ import { DealsModule } from './modules/deals/deals.module';
     WebhookTriggersModule,
     TeamsModule,
     DealsModule,
+    NotificationsModule,
     // Endpoints fake pra usar como Bot Tools em testes/demos com clientes.
     MockApiModule,
   ],

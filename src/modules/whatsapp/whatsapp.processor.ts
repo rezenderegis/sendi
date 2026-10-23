@@ -23,6 +23,7 @@ import { BroadcastRecipient, RecipientStatus } from '../broadcasts/broadcast-rec
 import { AutomationExecution, AutomationExecutionStatus } from '../automations/automation-execution.entity';
 import { phoneAlternative } from '../../common/utils/phone.util';
 import { decrypt } from '../../common/utils/crypto.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -118,6 +119,7 @@ export class WhatsappProcessor {
     private readonly broadcastRepo: Repository<Broadcast>,
     @InjectRepository(CampaignPrompt)
     private readonly campaignPromptRepo: Repository<CampaignPrompt>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Process('inbound-message')
@@ -198,6 +200,18 @@ export class WhatsappProcessor {
       });
 
       this.logger.log(`Mensagem inbound processada: ${message.id} de ${fromPhone}`);
+
+      // Push notification — dispara pra todo tipo de mensagem (texto ou
+      // mídia), sem esperar o fluxo de bot/IA abaixo, que só trata texto.
+      this.notificationsService
+        .notifyNewMessage({
+          companyId,
+          conversationId: conversation.id,
+          assignedUserId: conversation.assignedUserId ?? null,
+          contactName: contact.name || contact.phone,
+          messageContent: content,
+        })
+        .catch((e) => this.logger.warn(`Falha ao notificar mensagem nova: ${e.message}`));
 
       const MEDIA_TYPES = [MessageType.IMAGE, MessageType.AUDIO, MessageType.VIDEO, MessageType.DOCUMENT];
       if (MEDIA_TYPES.includes(type)) {

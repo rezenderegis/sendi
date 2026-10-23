@@ -21,6 +21,7 @@ import { AiModule } from '../ai/ai.module';
 import { BillingModule } from '../billing/billing.module';
 import { ExternalActionsModule } from '../external-actions/external-actions.module';
 import { FlowStepsModule } from '../flow-steps/flow-steps.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { FlowStepsModule } from '../flow-steps/flow-steps.module';
     BillingModule,
     ExternalActionsModule,
     FlowStepsModule,
+    NotificationsModule,
   ],
   controllers: [WhatsappController, WebhookController],
   providers: [WhatsappService, WebhookService, WhatsappProcessor, MediaProcessor, MediaService],
