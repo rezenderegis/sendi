@@ -5,6 +5,7 @@ import { Contact } from './contact.entity';
 import { CreateContactDto, UpdateContactDto } from './dto/create-contact.dto';
 import { Tag } from '../tags/tag.entity';
 import { Conversation } from '../conversations/conversation.entity';
+import { DealsService } from '../deals/deals.service';
 
 const TAG_COLUMNS = ['tag', 'tags', 'etiqueta', 'etiquetas'];
 import { parse } from 'csv-parse/sync';
@@ -59,6 +60,7 @@ export class ContactsService {
     private readonly tagRepository: Repository<Tag>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
+    private readonly dealsService: DealsService,
   ) {}
 
   async findAll(
@@ -307,6 +309,7 @@ export class ContactsService {
     filename: string,
     companyId: string,
     globalTagName?: string,
+    kanbanColumnId?: string,
   ): Promise<ImportResult> {
     const rawRows = parseRows(buffer, mimetype, filename);
     const result: ImportResult = { created: 0, updated: 0, failed: 0, errors: [] };
@@ -386,6 +389,13 @@ export class ContactsService {
             .of(contact.id)
             .add(tag.id)
             .catch(() => {}); // ignora duplicatas
+        }
+
+        // Kanban opcional — cria um negócio novo pra cada contato importado
+        // nessa raia, mesmo que o contato já tenha outro negócio ativo (é
+        // sempre permitido ter vários negócios pro mesmo contato).
+        if (kanbanColumnId) {
+          await this.dealsService.create(companyId, { contactId: contact.id, kanbanColumnId });
         }
       } catch (err) {
         result.failed++;

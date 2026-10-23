@@ -140,6 +140,7 @@ export class ContactsController {
     @CurrentUser('companyId') companyId: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('globalTagName') globalTagName?: string,
+    @Query('kanbanColumnId') kanbanColumnId?: string,
   ) {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
     return this.contactsService.importFromFile(
@@ -148,6 +149,7 @@ export class ContactsController {
       file.originalname,
       companyId,
       globalTagName,
+      kanbanColumnId,
     );
   }
 }
