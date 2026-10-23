@@ -65,7 +65,10 @@ export class NotificationsService implements OnModuleInit {
     contactName: string;
     messageContent: string;
   }): Promise<void> {
-    if (!this.initialized) return;
+    if (!this.initialized) {
+      this.logger.debug('Push ignorado: Firebase Admin não inicializado (FIREBASE_SERVICE_ACCOUNT_JSON ausente)');
+      return;
+    }
 
     const targetUserIds = params.assignedUserId
       ? [params.assignedUserId]
@@ -74,7 +77,10 @@ export class NotificationsService implements OnModuleInit {
     if (targetUserIds.length === 0) return;
 
     const tokens = await this.deviceTokenRepo.find({ where: { userId: In(targetUserIds) } });
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) {
+      this.logger.debug(`Push ignorado: nenhum device token cadastrado pra userIds=[${targetUserIds.join(', ')}]`);
+      return;
+    }
 
     const preview =
       params.messageContent.length > 100 ? `${params.messageContent.slice(0, 100)}…` : params.messageContent;
@@ -122,6 +128,8 @@ export class NotificationsService implements OnModuleInit {
       if (staleTokens.length > 0) {
         await this.deviceTokenRepo.delete({ token: In(staleTokens) });
       }
+
+      this.logger.debug(`Push enviado (${withSound ? 'com' : 'sem'} som): ${res.successCount}/${tokens.length} ok`);
     } catch (error) {
       this.logger.warn(`Falha ao enviar push: ${error.message}`);
     }
