@@ -120,6 +120,14 @@ export class NotificationsService implements OnModuleInit {
         },
       });
 
+      // Loga o motivo de cada falha — sem isso só sabemos "0/1 ok" e não o
+      // porquê (token inválido, credencial APNs errada, etc).
+      res.responses.forEach((r, i) => {
+        if (!r.success) {
+          this.logger.warn(`Token ${tokens[i].token.slice(0, 12)}... falhou: ${r.error?.code} — ${r.error?.message}`);
+        }
+      });
+
       // Remove tokens que o dispositivo não reconhece mais (app desinstalado,
       // reinstalado, etc) — sem isso a lista só cresce com lixo morto.
       const staleTokens = res.responses
