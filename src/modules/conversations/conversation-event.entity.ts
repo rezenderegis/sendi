@@ -7,6 +7,8 @@ export enum ConversationEventType {
   CAMPAIGN_EXPIRED = 'campaign_expired',
   EXTERNAL_ACTION_CALLED = 'external_action_called',
   FLOW_ACTION_EXECUTED = 'flow_action_executed',
+  TRANSFERRED_TO_DEPARTMENT = 'transferred_to_department',
+  TRANSFERRED_TO_USER = 'transferred_to_user',
 }
 
 @Entity('conversation_events')

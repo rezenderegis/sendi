@@ -147,6 +147,7 @@ export class WhatsappProcessor {
         companyId,
         contact.id,
         whatsappNumber.id,
+        whatsappNumber.defaultDepartmentId,
       );
 
       let content = '';
@@ -203,15 +204,23 @@ export class WhatsappProcessor {
 
       // Push notification — dispara pra todo tipo de mensagem (texto ou
       // mídia), sem esperar o fluxo de bot/IA abaixo, que só trata texto.
-      this.notificationsService
-        .notifyNewMessage({
+      // Sem atendente: notifica só o departamento (se tiver) em vez da
+      // empresa inteira — fallbackUserIds null preserva o comportamento
+      // antigo pra conversa sem departamento.
+      (async () => {
+        const fallbackUserIds =
+          !conversation.assignedUserId && conversation.departmentId
+            ? await this.conversationsService.findDepartmentMemberIds(conversation.departmentId, companyId)
+            : null;
+        await this.notificationsService.notifyNewMessage({
           companyId,
           conversationId: conversation.id,
           assignedUserId: conversation.assignedUserId ?? null,
+          fallbackUserIds,
           contactName: contact.name || contact.phone,
           messageContent: content,
-        })
-        .catch((e) => this.logger.warn(`Falha ao notificar mensagem nova: ${e.message}`));
+        });
+      })().catch((e) => this.logger.warn(`Falha ao notificar mensagem nova: ${e.message}`));
 
       const MEDIA_TYPES = [MessageType.IMAGE, MessageType.AUDIO, MessageType.VIDEO, MessageType.DOCUMENT];
       if (MEDIA_TYPES.includes(type)) {

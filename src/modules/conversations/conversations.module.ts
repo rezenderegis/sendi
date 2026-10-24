@@ -6,9 +6,15 @@ import { Conversation } from './conversation.entity';
 import { ConversationEvent } from './conversation-event.entity';
 import { Message } from './message.entity';
 import { Tag } from '../tags/tag.entity';
+import { User } from '../users/user.entity';
+import { AppNotification } from '../follow-ons/notification.entity';
+import { DepartmentsModule } from '../departments/departments.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Conversation, ConversationEvent, Message, Tag])],
+  imports: [
+    TypeOrmModule.forFeature([Conversation, ConversationEvent, Message, Tag, User, AppNotification]),
+    DepartmentsModule,
+  ],
   controllers: [ConversationsController],
   providers: [ConversationsService],
   exports: [ConversationsService],

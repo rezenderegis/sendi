@@ -16,6 +16,7 @@ import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { User } from '../users/user.entity';
 import { Message } from './message.entity';
 import { Tag } from '../tags/tag.entity';
+import { Department } from '../departments/department.entity';
 
 export enum ConversationStatus {
   OPEN = 'open',
@@ -64,6 +65,15 @@ export class Conversation {
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'assignedUserId' })
   assignedUser: User;
+
+  // Independente de assignedUserId — uma conversa pode estar num departamento
+  // sem ter atendente específico ainda (fila), ou ter os dois preenchidos.
+  @Column({ nullable: true })
+  departmentId: string | null;
+
+  @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'departmentId' })
+  department: Department | null;
 
   @OneToMany(() => Message, (message) => message.conversation)
   messages: Message[];

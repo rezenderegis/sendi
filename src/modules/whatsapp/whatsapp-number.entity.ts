@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { Company } from '../companies/company.entity';
+import { Department } from '../departments/department.entity';
 
 @Entity('whatsapp_numbers')
 export class WhatsappNumber {
@@ -55,6 +56,16 @@ export class WhatsappNumber {
 
   @Column({ type: 'jsonb', nullable: true, default: null })
   enabledFlowNames: string[] | null;
+
+  // Departamento que conversas novas desse número herdam automaticamente —
+  // só aplicado na criação (ver ConversationsService.findOrCreate), nunca
+  // sobrescreve departmentId de conversa já existente/já triada.
+  @Column({ nullable: true })
+  defaultDepartmentId: string | null;
+
+  @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'defaultDepartmentId' })
+  defaultDepartment: Department | null;
 
   @Column({ type: 'int', nullable: true })
   dailySpendLimitCents: number | null;

@@ -79,6 +79,12 @@ export class UpdateWhatsappNumberDto {
   @IsArray()
   @IsString({ each: true })
   enabledFlowNames?: string[] | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Departamento que conversas novas desse número herdam automaticamente' })
+  @ValidateIf((o) => o.defaultDepartmentId != null)
+  @IsUUID()
+  @IsOptional()
+  defaultDepartmentId?: string | null;
 }
 
 export class ConnectNumberDto {

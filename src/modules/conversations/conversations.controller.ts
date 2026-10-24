@@ -17,6 +17,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ConversationsService } from './conversations.service';
 import { ConversationStatus } from './conversation.entity';
+import { TransferConversationDto } from './dto/transfer-conversation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../../common/guards/company-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,11 +27,6 @@ class UpdateConversationDto {
   @IsEnum(ConversationStatus)
   @IsOptional()
   status?: ConversationStatus;
-
-  @ApiProperty({ required: false })
-  @IsUUID()
-  @IsOptional()
-  assignedUserId?: string;
 }
 
 class AddTagDto {
@@ -54,6 +50,9 @@ export class ConversationsController {
   @ApiQuery({ name: 'waitingReply', required: false, type: Boolean, description: 'Somente conversas aguardando resposta da empresa' })
   @ApiQuery({ name: 'waitingCustomerReply', required: false, type: Boolean, description: 'Somente conversas aguardando resposta do cliente' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Busca por nome ou telefone do contato, em toda a base' })
+  @ApiQuery({ name: 'departmentId', required: false, type: String, description: 'Filtrar por departamento' })
+  @ApiQuery({ name: 'unassigned', required: false, type: Boolean, description: 'Somente conversas sem atendente (fila)' })
+  @ApiQuery({ name: 'assignedUserId', required: false, type: String, description: 'Filtrar por atendente' })
   findAll(
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('role') role: string,
@@ -64,6 +63,9 @@ export class ConversationsController {
     @Query('waitingReply') waitingReply?: string,
     @Query('waitingCustomerReply') waitingCustomerReply?: string,
     @Query('search') search?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('unassigned') unassigned?: string,
+    @Query('assignedUserId') assignedUserId?: string,
   ) {
     const numberFilter = role === 'owner' ? null : allowedNumberIds;
     return this.conversationsService.findAll(
@@ -75,6 +77,9 @@ export class ConversationsController {
       waitingReply === 'true' ? true : undefined,
       waitingCustomerReply === 'true' ? true : undefined,
       search,
+      departmentId,
+      unassigned === 'true' ? true : undefined,
+      assignedUserId,
     );
   }
 
@@ -112,12 +117,18 @@ export class ConversationsController {
     @CurrentUser('companyId') companyId: string,
     @Body() dto: UpdateConversationDto,
   ) {
-    return this.conversationsService.updateStatus(
-      id,
-      companyId,
-      dto.status,
-      dto.assignedUserId,
-    );
+    return this.conversationsService.updateStatus(id, companyId, dto.status);
+  }
+
+  @Post(':id/transfer')
+  @ApiOperation({ summary: 'Transferir conversa pra um departamento e/ou pessoa' })
+  transfer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: TransferConversationDto,
+  ) {
+    return this.conversationsService.transfer(id, companyId, userId, dto);
   }
 
   @Post(':id/bot/disable')

@@ -57,11 +57,13 @@ export class NotificationsService implements OnModuleInit {
 
   // Notifica quem deve saber que chegou mensagem nova: o atendente
   // responsável, ou — se a conversa ainda não foi assumida por ninguém —
-  // todo mundo da empresa, pra alguém pegar.
+  // os membros do departamento dela (fallbackUserIds), ou se não tem
+  // departamento também, todo mundo da empresa, pra alguém pegar.
   async notifyNewMessage(params: {
     companyId: string;
     conversationId: string;
     assignedUserId: string | null;
+    fallbackUserIds?: string[] | null;
     contactName: string;
     messageContent: string;
   }): Promise<void> {
@@ -72,7 +74,7 @@ export class NotificationsService implements OnModuleInit {
 
     const targetUserIds = params.assignedUserId
       ? [params.assignedUserId]
-      : (await this.usersService.findAll(params.companyId)).map((u) => u.id);
+      : params.fallbackUserIds ?? (await this.usersService.findAll(params.companyId)).map((u) => u.id);
 
     if (targetUserIds.length === 0) return;
 

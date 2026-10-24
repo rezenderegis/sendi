@@ -202,7 +202,9 @@ export class FlowEngineService {
           }
           break;
         case 'assign_user':
-          if (cfg.userId) await this.conversationsService.updateStatus(conversation.id, companyId, undefined, cfg.userId);
+          if (cfg.userId) {
+            await this.conversationsService.transfer(conversation.id, companyId, 'system', { assignedUserId: cfg.userId });
+          }
           break;
         case 'close_conversation':
           await this.conversationsService.updateStatus(conversation.id, companyId, ConversationStatus.CLOSED);

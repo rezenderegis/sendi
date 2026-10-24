@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { Conversation, ConversationStatus } from './conversation.entity';
 import { ConversationEvent, ConversationEventType } from './conversation-event.entity';
 import { Message, MessageDirection, MessageStatus, MessageType } from './message.entity';
 import { Tag } from '../tags/tag.entity';
+import { User } from '../users/user.entity';
+import { AppNotification } from '../follow-ons/notification.entity';
+import { TransferConversationDto } from './dto/transfer-conversation.dto';
+import { DepartmentsService } from '../departments/departments.service';
 
 @Injectable()
 export class ConversationsService {
@@ -17,6 +21,11 @@ export class ConversationsService {
     private readonly tagRepository: Repository<Tag>,
     @InjectRepository(ConversationEvent)
     private readonly eventRepository: Repository<ConversationEvent>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(AppNotification)
+    private readonly notificationRepository: Repository<AppNotification>,
+    private readonly departmentsService: DepartmentsService,
   ) {}
 
   async createEvent(
@@ -46,12 +55,16 @@ export class ConversationsService {
     waitingReply?: boolean,
     waitingCustomerReply?: boolean,
     search?: string,
+    departmentId?: string,
+    unassigned?: boolean,
+    assignedUserId?: string,
   ): Promise<{ data: Conversation[]; total: number; page: number; limit: number }> {
     const qb = this.conversationRepository
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.contact', 'contact')
       .leftJoinAndSelect('c.whatsappNumber', 'whatsappNumber')
       .leftJoinAndSelect('c.assignedUser', 'assignedUser')
+      .leftJoinAndSelect('c.department', 'department')
       .leftJoinAndSelect('c.tags', 'tags')
       .where('c.companyId = :companyId', { companyId })
       .orderBy('c.lastMessageAt', 'DESC')
@@ -80,6 +93,18 @@ export class ConversationsService {
       qb.andWhere('(contact.name ILIKE :search OR contact.phone ILIKE :search)', { search: `%${search}%` });
     }
 
+    if (departmentId) {
+      qb.andWhere('c.departmentId = :departmentId', { departmentId });
+    }
+
+    if (unassigned === true) {
+      qb.andWhere('c.assignedUserId IS NULL');
+    }
+
+    if (assignedUserId) {
+      qb.andWhere('c.assignedUserId = :assignedUserId', { assignedUserId });
+    }
+
     const [data, total] = await qb.getManyAndCount();
     return { data, total, page, limit };
   }
@@ -87,7 +112,7 @@ export class ConversationsService {
   async findById(id: string, companyId: string): Promise<Conversation> {
     const conversation = await this.conversationRepository.findOne({
       where: { id, companyId },
-      relations: ['contact', 'whatsappNumber', 'assignedUser', 'tags'],
+      relations: ['contact', 'whatsappNumber', 'assignedUser', 'department', 'tags'],
     });
     if (!conversation) {
       throw new NotFoundException('Conversa não encontrada');
@@ -116,16 +141,102 @@ export class ConversationsService {
     return { data, hasMore: data.length === limit };
   }
 
-  async updateStatus(
-    id: string,
-    companyId: string,
-    status?: ConversationStatus,
-    assignedUserId?: string,
-  ): Promise<Conversation> {
+  async updateStatus(id: string, companyId: string, status?: ConversationStatus): Promise<Conversation> {
     const conversation = await this.findById(id, companyId);
     if (status !== undefined) conversation.status = status;
-    if (assignedUserId !== undefined) conversation.assignedUserId = assignedUserId;
     return this.conversationRepository.save(conversation);
+  }
+
+  // Transfere a conversa pra um departamento e/ou pessoa — campos
+  // independentes (undefined = não muda, null = limpa). Valida que o
+  // destino pertence à mesma empresa, loga o evento de transferência e
+  // notifica (sino) quem recebeu a conversa.
+  async transfer(
+    id: string,
+    companyId: string,
+    byUserId: string,
+    dto: TransferConversationDto,
+  ): Promise<Conversation> {
+    if (dto.departmentId === undefined && dto.assignedUserId === undefined) {
+      throw new BadRequestException('Informe departmentId e/ou assignedUserId');
+    }
+
+    const conversation = await this.findById(id, companyId);
+    const fromDepartmentId = conversation.departmentId;
+    const fromUserId = conversation.assignedUserId;
+    const contactId = conversation.contactId;
+
+    // Usa update() com patch de colunas em vez de save() numa entidade com
+    // relações já carregadas: conversation.department/assignedUser (carregados
+    // por findById) ficam com o valor ANTIGO em memória, e o TypeORM prioriza
+    // a relação sobre o FK escalar ao salvar — isso silenciosamente ignorava
+    // o null explícito de "devolver pra fila"/"remover delegação".
+    const patch: Record<string, string | null> = {};
+    if (dto.departmentId !== undefined) {
+      if (dto.departmentId) await this.departmentsService.findById(dto.departmentId, companyId);
+      patch.departmentId = dto.departmentId;
+    }
+    if (dto.assignedUserId !== undefined) {
+      if (dto.assignedUserId) {
+        const user = await this.userRepository.findOne({ where: { id: dto.assignedUserId, companyId } });
+        if (!user) throw new NotFoundException('Usuário não encontrado');
+      }
+      patch.assignedUserId = dto.assignedUserId;
+    }
+    await this.conversationRepository.update({ id, companyId }, patch);
+    const saved = { contactId };
+
+    if (dto.departmentId !== undefined && dto.departmentId !== fromDepartmentId) {
+      await this.createEvent(id, ConversationEventType.TRANSFERRED_TO_DEPARTMENT, {
+        fromDepartmentId,
+        toDepartmentId: dto.departmentId,
+        byUserId,
+      });
+      if (dto.departmentId) {
+        const memberIds = await this.departmentsService.findMemberIds(dto.departmentId, companyId);
+        await Promise.all(
+          memberIds.map((userId) =>
+            this.notificationRepository.save(
+              this.notificationRepository.create({
+                companyId,
+                userId,
+                title: 'Nova conversa no departamento',
+                conversationId: id,
+                contactId: saved.contactId,
+              }),
+            ),
+          ),
+        );
+      }
+    }
+
+    if (dto.assignedUserId !== undefined && dto.assignedUserId !== fromUserId) {
+      await this.createEvent(id, ConversationEventType.TRANSFERRED_TO_USER, {
+        fromUserId,
+        toUserId: dto.assignedUserId,
+        byUserId,
+      });
+      if (dto.assignedUserId) {
+        await this.notificationRepository.save(
+          this.notificationRepository.create({
+            companyId,
+            userId: dto.assignedUserId,
+            title: 'Conversa transferida pra você',
+            conversationId: id,
+            contactId: saved.contactId,
+          }),
+        );
+      }
+    }
+
+    // save() pode devolver a relação "department" desatualizada quando o FK
+    // escalar é setado direto sem recarregar a relação — refaz o findById
+    // pra garantir que a resposta reflete o estado real pós-save.
+    return this.findById(id, companyId);
+  }
+
+  findDepartmentMemberIds(departmentId: string, companyId: string): Promise<string[]> {
+    return this.departmentsService.findMemberIds(departmentId, companyId);
   }
 
   async addTag(conversationId: string, companyId: string, tagId: string): Promise<void> {
@@ -157,6 +268,7 @@ export class ConversationsService {
     companyId: string,
     contactId: string,
     whatsappNumberId: string,
+    defaultDepartmentId?: string | null,
   ): Promise<Conversation> {
     let conversation = await this.conversationRepository.findOne({
       where: {
@@ -193,6 +305,7 @@ export class ConversationsService {
         whatsappNumberId,
         status: ConversationStatus.OPEN,
         lastMessageAt: new Date(),
+        departmentId: defaultDepartmentId ?? null,
         ...(campaignSource ? {
           campaignPrompt: campaignSource.campaignPrompt,
           campaignBroadcastId: campaignSource.campaignBroadcastId,
