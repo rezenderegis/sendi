@@ -31,6 +31,8 @@ import { MockApiModule } from './modules/mock-api/mock-api.module';
 import { WebhookTriggersModule } from './modules/webhook-triggers/webhook-triggers.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import { SchedulingModule } from './modules/scheduling/scheduling.module';
+import { AppointmentRemindersModule } from './modules/scheduling/appointment-reminders.module';
 import { DealsModule } from './modules/deals/deals.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
@@ -116,6 +118,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     WebhookTriggersModule,
     TeamsModule,
     DepartmentsModule,
+    SchedulingModule,
+    AppointmentRemindersModule,
     DealsModule,
     NotificationsModule,
     // Endpoints fake pra usar como Bot Tools em testes/demos com clientes.

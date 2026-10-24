@@ -24,6 +24,8 @@ import { AutomationExecution, AutomationExecutionStatus } from '../automations/a
 import { phoneAlternative } from '../../common/utils/phone.util';
 import { decrypt } from '../../common/utils/crypto.util';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ServicesService } from '../scheduling/services.service';
+import { AppointmentsService } from '../scheduling/appointments.service';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -120,6 +122,8 @@ export class WhatsappProcessor {
     @InjectRepository(CampaignPrompt)
     private readonly campaignPromptRepo: Repository<CampaignPrompt>,
     private readonly notificationsService: NotificationsService,
+    private readonly servicesService: ServicesService,
+    private readonly appointmentsService: AppointmentsService,
   ) {}
 
   @Process('inbound-message')
@@ -529,6 +533,42 @@ export class WhatsappProcessor {
       },
     });
 
+    // Tools de agendamento só aparecem se a empresa já tiver cadastrado
+    // algum serviço — evita poluir o prompt/lista de tools pra quem não usa.
+    const activeServices = await this.servicesService.findAll(companyId).then((list) => list.filter((s) => s.isActive));
+    if (activeServices.length > 0) {
+      tools.push({
+        name: 'listar_servicos_disponiveis',
+        description: 'Lista os serviços que podem ser agendados, com a duração de cada um.',
+        parameters: { type: 'object', properties: {} },
+      });
+      tools.push({
+        name: 'buscar_horarios_disponiveis',
+        description: 'Busca os próximos horários livres pra um serviço, opcionalmente filtrando por profissional preferido. Use isso pra saber quais profissionais atendem esse serviço e oferecer a escolha ao cliente.',
+        parameters: {
+          type: 'object',
+          properties: {
+            servicoId: { type: 'string' },
+            profissionalId: { type: 'string', description: 'Opcional — só se o cliente já indicou preferência' },
+          },
+          required: ['servicoId'],
+        },
+      });
+      tools.push({
+        name: 'confirmar_agendamento',
+        description: 'Confirma e marca o agendamento depois que o cliente escolheu serviço, profissional e horário (vindos de buscar_horarios_disponiveis).',
+        parameters: {
+          type: 'object',
+          properties: {
+            servicoId: { type: 'string' },
+            profissionalId: { type: 'string' },
+            horario: { type: 'string', description: 'Data/hora ISO do slot escolhido, exatamente como veio em buscar_horarios_disponiveis' },
+          },
+          required: ['servicoId', 'profissionalId', 'horario'],
+        },
+      });
+    }
+
     const executeTool = async (name: string, args: any) => {
       if (name === 'salvar_variavel') {
         if (!/^[a-z0-9_]+$/.test(args.nome ?? '')) {
@@ -553,6 +593,52 @@ export class WhatsappProcessor {
           return { success: true, result: 'fluxo executado (só continha blocos automáticos) e encerrado imediatamente' };
         }
         return { success: true, result: 'fluxo iniciado' };
+      }
+
+      if (name === 'listar_servicos_disponiveis') {
+        return {
+          success: true,
+          result: activeServices.map((s) => ({ id: s.id, nome: s.name, duracaoMinutos: s.durationMinutes })),
+        };
+      }
+
+      if (name === 'buscar_horarios_disponiveis') {
+        try {
+          const slots = await this.appointmentsService.findAvailableSlots(companyId, {
+            serviceId: args.servicoId,
+            professionalId: args.profissionalId,
+          });
+          if (slots.length === 0) {
+            return { success: true, result: 'Nenhum horário livre encontrado nos próximos dias pra esse serviço/profissional.' };
+          }
+          return {
+            success: true,
+            result: slots.slice(0, 15).map((s) => ({
+              profissionalId: s.professionalId,
+              profissional: s.professionalName,
+              horario: s.startAt.toISOString(),
+            })),
+          };
+        } catch (e: any) {
+          return { success: false, result: e.message };
+        }
+      }
+
+      if (name === 'confirmar_agendamento') {
+        try {
+          const appointment = await this.appointmentsService.createAppointment(companyId, {
+            contactId: contact.id,
+            serviceId: args.servicoId,
+            professionalId: args.profissionalId,
+            scheduledAt: args.horario,
+          });
+          return {
+            success: true,
+            result: `Agendamento confirmado pra ${new Date(appointment.scheduledAt).toLocaleString('pt-BR')} com ${appointment.professional?.name}.`,
+          };
+        } catch (e: any) {
+          return { success: false, result: e.message };
+        }
       }
 
       const action = actions.find((a) => a.name === name);
