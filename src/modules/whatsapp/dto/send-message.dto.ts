@@ -59,10 +59,11 @@ export class SendMessageDto {
 }
 
 export class UpdateWhatsappNumberDto {
-  @ApiPropertyOptional({ example: 'Você é um assistente da Empresa X...' })
+  @ApiPropertyOptional({ example: 'Você é um assistente da Empresa X...', nullable: true })
+  @ValidateIf((o) => o.systemPrompt != null)
   @IsString()
   @IsOptional()
-  systemPrompt?: string;
+  systemPrompt?: string | null;
 
   @ApiPropertyOptional({ example: 20, description: 'Quantidade de mensagens recentes enviadas ao LLM como contexto' })
   @IsOptional()
