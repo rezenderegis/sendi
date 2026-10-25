@@ -86,6 +86,12 @@ export class UpdateWhatsappNumberDto {
   @IsUUID()
   @IsOptional()
   defaultDepartmentId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Prompt salvo que originou o systemPrompt acima — só pra marcar a opção certa no dropdown' })
+  @ValidateIf((o) => o.promptSourceId != null)
+  @IsUUID()
+  @IsOptional()
+  promptSourceId?: string | null;
 }
 
 export class ConnectNumberDto {

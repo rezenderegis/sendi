@@ -10,6 +10,7 @@ import {
 import { Exclude } from 'class-transformer';
 import { Company } from '../companies/company.entity';
 import { Department } from '../departments/department.entity';
+import { CampaignPrompt } from '../campaign-prompts/campaign-prompt.entity';
 
 @Entity('whatsapp_numbers')
 export class WhatsappNumber {
@@ -47,6 +48,17 @@ export class WhatsappNumber {
 
   @Column({ type: 'text', nullable: true })
   systemPrompt: string | null;
+
+  // Qual prompt salvo (se algum) originou o texto de systemPrompt acima —
+  // só pra marcar a opção certa no dropdown da tela de configuração; quem
+  // o bot de fato usa é o texto copiado em systemPrompt, não essa referência
+  // (editar/apagar o prompt salvo depois não muda o que já foi copiado aqui).
+  @Column({ nullable: true })
+  promptSourceId: string | null;
+
+  @ManyToOne(() => CampaignPrompt, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'promptSourceId' })
+  promptSource: CampaignPrompt | null;
 
   @Column({ type: 'int', default: 20 })
   botHistoryLimit: number;
