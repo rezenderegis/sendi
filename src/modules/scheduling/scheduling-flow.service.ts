@@ -8,6 +8,15 @@ export type SchedulingState =
   | { step: 'day'; serviceId: string }
   | { step: 'time'; serviceId: string; day: string };
 
+// Nome/descrição centralizados aqui (não duplicados no processor e no
+// simulador) — já causou um bug real: a descrição divergiu entre os dois e
+// a IA passou a inventar informação (tipo "link de agendamento") que não
+// existe em lugar nenhum, só porque a versão de um dos dois lados ficou
+// desatualizada.
+export const SCHEDULING_TOOL_NAME = 'iniciar_agendamento';
+export const SCHEDULING_TOOL_DESCRIPTION =
+  'Assim que o cliente demonstrar interesse em marcar um horário, chame esta ferramenta IMEDIATAMENTE, sem perguntar como ele prefere agendar nem descrever o processo antes — ela já envia uma lista fixa (serviço → dia → horário) pro cliente escolher. Não existe opção de link ou ligação de consultor pra isso: é só essa lista. A partir da chamada, a condução é automática, não é mais você quem conversa sobre isso.';
+
 export interface SchedulingStepResult {
   bodyText: string;
   options: { label: string; value: string }[];

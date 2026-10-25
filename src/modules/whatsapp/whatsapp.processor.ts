@@ -24,7 +24,13 @@ import { AutomationExecution, AutomationExecutionStatus } from '../automations/a
 import { phoneAlternative } from '../../common/utils/phone.util';
 import { decrypt } from '../../common/utils/crypto.util';
 import { NotificationsService } from '../notifications/notifications.service';
-import { SchedulingFlowService, SchedulingState, SchedulingStepResult } from '../scheduling/scheduling-flow.service';
+import {
+  SchedulingFlowService,
+  SchedulingState,
+  SchedulingStepResult,
+  SCHEDULING_TOOL_NAME,
+  SCHEDULING_TOOL_DESCRIPTION,
+} from '../scheduling/scheduling-flow.service';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -552,12 +558,12 @@ export class WhatsappProcessor {
     // de agendamento ficam de fora — evita misturar "agendar reunião
     // comercial" (ex: campanha de vendas) com "agendar horário de
     // atendimento" na mesma conversa.
-    const schedulingAllowed = !enabledToolNames?.length || enabledToolNames.includes('iniciar_agendamento');
+    const schedulingAllowed = !enabledToolNames?.length || enabledToolNames.includes(SCHEDULING_TOOL_NAME);
     const activeServices = await this.schedulingFlowService.findActiveServices(companyId);
     if (activeServices.length > 0 && schedulingAllowed) {
       tools.push({
-        name: 'iniciar_agendamento',
-        description: 'Inicia o processo de agendamento quando o cliente quer marcar um horário. Envia uma lista fixa (serviço → dia → horário) pro cliente escolher diretamente — a partir daqui a condução é automática, não é mais você quem conversa sobre isso.',
+        name: SCHEDULING_TOOL_NAME,
+        description: SCHEDULING_TOOL_DESCRIPTION,
         parameters: { type: 'object', properties: {} },
       });
     }
@@ -588,7 +594,7 @@ export class WhatsappProcessor {
         return { success: true, result: 'fluxo iniciado' };
       }
 
-      if (name === 'iniciar_agendamento') {
+      if (name === SCHEDULING_TOOL_NAME) {
         const result = await this.schedulingFlowService.start(companyId);
         await this.applySchedulingResult(whatsappNumber, fromPhone, conversation.id, companyId, result);
         return { success: true, result: 'lista de agendamento enviada ao cliente — não responda mais sobre isso, a condução agora é automática' };

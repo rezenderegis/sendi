@@ -11,7 +11,13 @@ import { FlowsService } from '../flow-steps/flows.service';
 import { FlowStepsService } from '../flow-steps/flow-steps.service';
 import { FlowEngineService, FlowMessageSink } from '../flow-steps/flow-engine.service';
 import { FlowStepOption } from '../flow-steps/flow-step.entity';
-import { SchedulingFlowService, SchedulingState, SchedulingStepResult } from '../scheduling/scheduling-flow.service';
+import {
+  SchedulingFlowService,
+  SchedulingState,
+  SchedulingStepResult,
+  SCHEDULING_TOOL_NAME,
+  SCHEDULING_TOOL_DESCRIPTION,
+} from '../scheduling/scheduling-flow.service';
 
 function renderSchedulingReply(result: SchedulingStepResult): string {
   if (!result.options.length) return result.bodyText;
@@ -120,12 +126,12 @@ export class AiController {
       });
     }
 
-    const schedulingAllowed = !dto.enabledToolNames?.length || dto.enabledToolNames.includes('iniciar_agendamento');
+    const schedulingAllowed = !dto.enabledToolNames?.length || dto.enabledToolNames.includes(SCHEDULING_TOOL_NAME);
     const activeServices = await this.schedulingFlowService.findActiveServices(companyId);
     if (activeServices.length > 0 && schedulingAllowed) {
       tools.push({
-        name: 'iniciar_agendamento',
-        description: 'Inicia o processo de agendamento quando o cliente quer marcar um horário. Envia uma lista fixa (serviço → dia → horário) pro cliente escolher diretamente — a partir daqui a condução é automática, não é mais você quem conversa sobre isso.',
+        name: SCHEDULING_TOOL_NAME,
+        description: SCHEDULING_TOOL_DESCRIPTION,
         parameters: { type: 'object', properties: {} },
       });
     }
@@ -148,7 +154,7 @@ export class AiController {
     const executeTool = async (name: string, args: any) => {
       let result: any;
       try {
-        if (name === 'iniciar_agendamento') {
+        if (name === SCHEDULING_TOOL_NAME) {
           const stepResult = await this.schedulingFlowService.start(companyId);
           nextSchedulingState = stepResult.nextState;
           schedulingReplyOverride = renderSchedulingReply(stepResult);
