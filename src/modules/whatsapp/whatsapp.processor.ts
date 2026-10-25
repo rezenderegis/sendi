@@ -548,10 +548,10 @@ export class WhatsappProcessor {
         parameters: {
           type: 'object',
           properties: {
-            servicoId: { type: 'string' },
+            servico: { type: 'string', enum: activeServices.map((s) => s.name), description: 'Nome do serviço, exatamente como veio em listar_servicos_disponiveis' },
             profissionalId: { type: 'string', description: 'Opcional — só se o cliente já indicou preferência' },
           },
-          required: ['servicoId'],
+          required: ['servico'],
         },
       });
       tools.push({
@@ -560,7 +560,7 @@ export class WhatsappProcessor {
         parameters: {
           type: 'object',
           properties: {
-            servicoId: { type: 'string' },
+            servico: { type: 'string', enum: activeServices.map((s) => s.name), description: 'Nome do serviço, exatamente como veio em listar_servicos_disponiveis' },
             profissionalId: { type: 'string' },
             horario: { type: 'string', description: 'Data/hora ISO do slot escolhido, exatamente como veio em buscar_horarios_disponiveis' },
           },
@@ -603,9 +603,13 @@ export class WhatsappProcessor {
       }
 
       if (name === 'buscar_horarios_disponiveis') {
+        const service = activeServices.find((s) => s.name === args.servico);
+        if (!service) {
+          return { success: false, result: `Serviço "${args.servico}" não encontrado — use um dos nomes retornados por listar_servicos_disponiveis.` };
+        }
         try {
           const slots = await this.appointmentsService.findAvailableSlots(companyId, {
-            serviceId: args.servicoId,
+            serviceId: service.id,
             professionalId: args.profissionalId,
           });
           if (slots.length === 0) {
@@ -625,10 +629,14 @@ export class WhatsappProcessor {
       }
 
       if (name === 'confirmar_agendamento') {
+        const service = activeServices.find((s) => s.name === args.servico);
+        if (!service) {
+          return { success: false, result: `Serviço "${args.servico}" não encontrado — use um dos nomes retornados por listar_servicos_disponiveis.` };
+        }
         try {
           const appointment = await this.appointmentsService.createAppointment(companyId, {
             contactId: contact.id,
-            serviceId: args.servicoId,
+            serviceId: service.id,
             professionalId: args.profissionalId,
             scheduledAt: args.horario,
           });
