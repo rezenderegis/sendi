@@ -175,7 +175,9 @@ export class AiService {
         } catch {
           this.logger.warn(`Argumentos inválidos da tool ${call.function.name}: ${call.function.arguments}`);
         }
+        this.logger.log(`Tool chamada: ${call.function.name} args=${JSON.stringify(args)}`);
         const outcome = await options.executeTool(call.function.name, args);
+        this.logger.log(`Tool ${call.function.name} -> success=${outcome.success} result=${JSON.stringify(outcome.result)}`);
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
@@ -184,6 +186,7 @@ export class AiService {
       }
     }
 
+    this.logger.warn('Limite de rounds de tool-calls atingido sem resposta final');
     return 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
   }
 }
