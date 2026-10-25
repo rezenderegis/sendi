@@ -24,8 +24,7 @@ import { AutomationExecution, AutomationExecutionStatus } from '../automations/a
 import { phoneAlternative } from '../../common/utils/phone.util';
 import { decrypt } from '../../common/utils/crypto.util';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ServicesService } from '../scheduling/services.service';
-import { AppointmentsService } from '../scheduling/appointments.service';
+import { SchedulingFlowService, SchedulingState, SchedulingStepResult } from '../scheduling/scheduling-flow.service';
 
 const HUMAN_WORDS = [
   'humano', 'humana',
@@ -122,8 +121,7 @@ export class WhatsappProcessor {
     @InjectRepository(CampaignPrompt)
     private readonly campaignPromptRepo: Repository<CampaignPrompt>,
     private readonly notificationsService: NotificationsService,
-    private readonly servicesService: ServicesService,
-    private readonly appointmentsService: AppointmentsService,
+    private readonly schedulingFlowService: SchedulingFlowService,
   ) {}
 
   @Process('inbound-message')
@@ -398,6 +396,21 @@ export class WhatsappProcessor {
         return;
       }
 
+      if (conversation.aiState?.startsWith('scheduling:')) {
+        const vars = conversation.variables ?? {};
+        const step = conversation.aiState.slice('scheduling:'.length) as SchedulingState['step'];
+        const state: SchedulingState =
+          step === 'day'
+            ? { step: 'day', serviceId: vars.scheduling_serviceId }
+            : step === 'time'
+              ? { step: 'time', serviceId: vars.scheduling_serviceId, day: vars.scheduling_day }
+              : { step: 'service' };
+
+        const result = await this.schedulingFlowService.advance(companyId, state, botContent, interactiveReplyId, contact.id, false);
+        await this.applySchedulingResult(whatsappNumber, fromPhone, conversation.id, companyId, result);
+        return;
+      }
+
       const contactHasName = contact.name !== contact.phone;
 
       if (conversation.aiState === 'waiting_name') {
@@ -535,37 +548,17 @@ export class WhatsappProcessor {
 
     // Tools de agendamento só aparecem se a empresa já tiver cadastrado
     // algum serviço — evita poluir o prompt/lista de tools pra quem não usa.
-    const activeServices = await this.servicesService.findAll(companyId).then((list) => list.filter((s) => s.isActive));
-    if (activeServices.length > 0) {
+    // Campanhas que restringem enabledToolNames e não incluem nenhuma tool
+    // de agendamento ficam de fora — evita misturar "agendar reunião
+    // comercial" (ex: campanha de vendas) com "agendar horário de
+    // atendimento" na mesma conversa.
+    const schedulingAllowed = !enabledToolNames?.length || enabledToolNames.includes('iniciar_agendamento');
+    const activeServices = await this.schedulingFlowService.findActiveServices(companyId);
+    if (activeServices.length > 0 && schedulingAllowed) {
       tools.push({
-        name: 'listar_servicos_disponiveis',
-        description: 'Lista os serviços que podem ser agendados, com a duração de cada um.',
+        name: 'iniciar_agendamento',
+        description: 'Inicia o processo de agendamento quando o cliente quer marcar um horário. Envia uma lista fixa (serviço → dia → horário) pro cliente escolher diretamente — a partir daqui a condução é automática, não é mais você quem conversa sobre isso.',
         parameters: { type: 'object', properties: {} },
-      });
-      tools.push({
-        name: 'buscar_horarios_disponiveis',
-        description: 'Busca os próximos horários livres pra um serviço, opcionalmente filtrando por profissional preferido. Use isso pra saber quais profissionais atendem esse serviço e oferecer a escolha ao cliente.',
-        parameters: {
-          type: 'object',
-          properties: {
-            servico: { type: 'string', enum: activeServices.map((s) => s.name), description: 'Nome do serviço, exatamente como veio em listar_servicos_disponiveis' },
-            profissionalId: { type: 'string', description: 'Opcional — só se o cliente já indicou preferência' },
-          },
-          required: ['servico'],
-        },
-      });
-      tools.push({
-        name: 'confirmar_agendamento',
-        description: 'Confirma e marca o agendamento depois que o cliente escolheu serviço, profissional e horário (vindos de buscar_horarios_disponiveis).',
-        parameters: {
-          type: 'object',
-          properties: {
-            servico: { type: 'string', enum: activeServices.map((s) => s.name), description: 'Nome do serviço, exatamente como veio em listar_servicos_disponiveis' },
-            profissionalId: { type: 'string' },
-            horario: { type: 'string', description: 'Data/hora ISO do slot escolhido, exatamente como veio em buscar_horarios_disponiveis' },
-          },
-          required: ['servicoId', 'profissionalId', 'horario'],
-        },
       });
     }
 
@@ -595,58 +588,10 @@ export class WhatsappProcessor {
         return { success: true, result: 'fluxo iniciado' };
       }
 
-      if (name === 'listar_servicos_disponiveis') {
-        return {
-          success: true,
-          result: activeServices.map((s) => ({ id: s.id, nome: s.name, duracaoMinutos: s.durationMinutes })),
-        };
-      }
-
-      if (name === 'buscar_horarios_disponiveis') {
-        const service = activeServices.find((s) => s.name === args.servico);
-        if (!service) {
-          return { success: false, result: `Serviço "${args.servico}" não encontrado — use um dos nomes retornados por listar_servicos_disponiveis.` };
-        }
-        try {
-          const slots = await this.appointmentsService.findAvailableSlots(companyId, {
-            serviceId: service.id,
-            professionalId: args.profissionalId,
-          });
-          if (slots.length === 0) {
-            return { success: true, result: 'Nenhum horário livre encontrado nos próximos dias pra esse serviço/profissional.' };
-          }
-          return {
-            success: true,
-            result: slots.slice(0, 15).map((s) => ({
-              profissionalId: s.professionalId,
-              profissional: s.professionalName,
-              horario: s.startAt.toISOString(),
-            })),
-          };
-        } catch (e: any) {
-          return { success: false, result: e.message };
-        }
-      }
-
-      if (name === 'confirmar_agendamento') {
-        const service = activeServices.find((s) => s.name === args.servico);
-        if (!service) {
-          return { success: false, result: `Serviço "${args.servico}" não encontrado — use um dos nomes retornados por listar_servicos_disponiveis.` };
-        }
-        try {
-          const appointment = await this.appointmentsService.createAppointment(companyId, {
-            contactId: contact.id,
-            serviceId: service.id,
-            professionalId: args.profissionalId,
-            scheduledAt: args.horario,
-          });
-          return {
-            success: true,
-            result: `Agendamento confirmado pra ${new Date(appointment.scheduledAt).toLocaleString('pt-BR')} com ${appointment.professional?.name}.`,
-          };
-        } catch (e: any) {
-          return { success: false, result: e.message };
-        }
+      if (name === 'iniciar_agendamento') {
+        const result = await this.schedulingFlowService.start(companyId);
+        await this.applySchedulingResult(whatsappNumber, fromPhone, conversation.id, companyId, result);
+        return { success: true, result: 'lista de agendamento enviada ao cliente — não responda mais sobre isso, a condução agora é automática' };
       }
 
       const action = actions.find((a) => a.name === name);
@@ -676,6 +621,35 @@ export class WhatsappProcessor {
       companyId,
       aiPromptSource,
     );
+  }
+
+  // Único ponto que efetivamente manda mensagem/grava estado pro fluxo de
+  // agendamento — tanto o início (tool iniciar_agendamento) quanto cada
+  // passo seguinte (ver aiState?.startsWith('scheduling:') acima) terminam
+  // aqui. Mantém a lógica de decisão (o que perguntar, o que validar) só no
+  // SchedulingFlowService, compartilhada com o simulador de prompt.
+  private async applySchedulingResult(
+    whatsappNumber: any,
+    fromPhone: string,
+    conversationId: string,
+    companyId: string,
+    result: SchedulingStepResult,
+  ): Promise<void> {
+    if (!result.nextState) {
+      await this.conversationsService.updateAiState(conversationId, null);
+      await this.whatsappService.sendBotReply(whatsappNumber, fromPhone, result.bodyText, conversationId, companyId);
+      return;
+    }
+
+    if (result.nextState.step === 'day') {
+      await this.conversationsService.setVariable(conversationId, 'scheduling_serviceId', result.nextState.serviceId);
+    } else if (result.nextState.step === 'time') {
+      await this.conversationsService.setVariable(conversationId, 'scheduling_serviceId', result.nextState.serviceId);
+      await this.conversationsService.setVariable(conversationId, 'scheduling_day', result.nextState.day);
+    }
+
+    await this.conversationsService.updateAiState(conversationId, `scheduling:${result.nextState.step}`);
+    await this.whatsappService.sendBotInteractive(whatsappNumber, fromPhone, result.bodyText, result.options, conversationId, companyId);
   }
 
   @Process('status-update')

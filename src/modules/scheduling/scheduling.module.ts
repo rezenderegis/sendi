@@ -13,6 +13,7 @@ import { ProfessionalsService } from './professionals.service';
 import { ProfessionalsController } from './professionals.controller';
 import { AppointmentsService } from './appointments.service';
 import { AppointmentsController } from './appointments.controller';
+import { SchedulingFlowService } from './scheduling-flow.service';
 
 // Não importa WhatsappModule aqui — quem precisa enviar mensagem (o cron de
 // lembrete) fica num módulo separado (AppointmentRemindersModule), pra evitar
@@ -21,7 +22,7 @@ import { AppointmentsController } from './appointments.controller';
 @Module({
   imports: [TypeOrmModule.forFeature([Service, Professional, ProfessionalAvailability, ProfessionalTimeOff, Appointment, User, AppNotification])],
   controllers: [ServicesController, ProfessionalsController, AppointmentsController],
-  providers: [ServicesService, ProfessionalsService, AppointmentsService],
-  exports: [ServicesService, ProfessionalsService, AppointmentsService],
+  providers: [ServicesService, ProfessionalsService, AppointmentsService, SchedulingFlowService],
+  exports: [ServicesService, ProfessionalsService, AppointmentsService, SchedulingFlowService],
 })
 export class SchedulingModule {}
