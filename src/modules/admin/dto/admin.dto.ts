@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdatePlatformSettingsDto {
@@ -59,6 +59,11 @@ export class CreditBalanceDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+export class SetLandingPageActiveDto {
+  @IsBoolean()
+  isActive: boolean;
 }
 
 export class SetNumberLimitsDto {

@@ -35,6 +35,7 @@ import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { AppointmentRemindersModule } from './modules/scheduling/appointment-reminders.module';
 import { DealsModule } from './modules/deals/deals.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { LandingPagesModule } from './modules/landing-pages/landing-pages.module';
 
 @Module({
   imports: [
@@ -119,6 +120,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     TeamsModule,
     DepartmentsModule,
     SchedulingModule,
+    LandingPagesModule,
     AppointmentRemindersModule,
     DealsModule,
     NotificationsModule,

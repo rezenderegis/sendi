@@ -5,6 +5,7 @@ import { Company } from '../companies/company.entity';
 import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { UsageService } from '../billing/usage.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { LandingPagesService } from '../landing-pages/landing-pages.service';
 import { CreditBalanceDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class AdminService {
     private readonly numberRepo: Repository<WhatsappNumber>,
     private readonly usageService: UsageService,
     private readonly whatsappService: WhatsappService,
+    private readonly landingPagesService: LandingPagesService,
   ) {}
 
   async listCompanies() {
@@ -61,6 +63,14 @@ export class AdminService {
     if (dto.dailySpendLimitCents !== undefined) number.dailySpendLimitCents = dto.dailySpendLimitCents;
     if (dto.monthlySpendLimitCents !== undefined) number.monthlySpendLimitCents = dto.monthlySpendLimitCents;
     return this.numberRepo.save(number);
+  }
+
+  listLandingPages() {
+    return this.landingPagesService.findAll();
+  }
+
+  setLandingPageActive(slug: string, isActive: boolean) {
+    return this.landingPagesService.setActive(slug, isActive);
   }
 
   async getReconciliation(numberId: string, since: Date, until: Date) {

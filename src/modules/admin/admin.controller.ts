@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
-import { CreditBalanceDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
+import { CreditBalanceDto, SetLandingPageActiveDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -45,6 +45,16 @@ export class AdminController {
   @Patch('whatsapp-numbers/:id/limits')
   setNumberLimits(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetNumberLimitsDto) {
     return this.adminService.setNumberLimits(id, dto);
+  }
+
+  @Get('landing-pages')
+  listLandingPages() {
+    return this.adminService.listLandingPages();
+  }
+
+  @Patch('landing-pages/:slug')
+  setLandingPageActive(@Param('slug') slug: string, @Body() dto: SetLandingPageActiveDto) {
+    return this.adminService.setLandingPageActive(slug, dto.isActive);
   }
 
   @Get('whatsapp-numbers/:id/reconciliation')
