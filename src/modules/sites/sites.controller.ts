@@ -21,7 +21,7 @@ export class SitesController {
   @ApiOperation({ summary: 'Gerar HTML de uma landing page a partir de um prompt livre' })
   async generate(@CurrentUser('companyId') companyId: string, @Body() dto: GenerateSiteHtmlDto) {
     await this.sitesService.assertPagesModuleEnabled(companyId);
-    const html = await this.aiService.generateSiteHtml(dto.prompt);
+    const html = await this.aiService.generateSiteHtml(dto.prompt, dto.currentHtml);
     return { html };
   }
 

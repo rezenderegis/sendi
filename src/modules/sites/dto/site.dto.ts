@@ -19,6 +19,10 @@ export class GenerateSiteHtmlDto {
   @MinLength(5)
   @MaxLength(2000)
   prompt: string;
+
+  @IsOptional()
+  @IsString()
+  currentHtml?: string;
 }
 
 export class UpdateSiteDto {

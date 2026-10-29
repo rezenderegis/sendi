@@ -194,8 +194,14 @@ export class AiService {
   // usado pelo GlobalSixPages (módulo sites). Chamada separada de chat()
   // porque precisa de um max_tokens bem maior (uma página HTML com CSS
   // inline facilmente passa de 200 tokens) e não tem relação com conversa.
-  async generateSiteHtml(prompt: string): Promise<string> {
-    const systemPrompt = `Você é um gerador de landing pages em HTML puro.
+  async generateSiteHtml(prompt: string, currentHtml?: string): Promise<string> {
+    const systemPrompt = currentHtml
+      ? `Você vai receber um HTML existente de uma landing page e um pedido de ajuste do usuário.
+
+Modifique o HTML aplicando o pedido, preservando o restante do conteúdo e da estrutura sempre que possível — não recrie a página do zero, edite-a.
+
+Responda com o HTML COMPLETO atualizado (documento inteiro, <!doctype html> até </html>). Sem explicações antes ou depois, sem markdown, sem blocos de código com \`\`\`.`
+      : `Você é um gerador de landing pages em HTML puro.
 
 Gere um documento HTML completo e autocontido: <!doctype html>, <html>, <head> com <style> inline (sem dependências externas), <body> — moderno, bonito, responsivo (funciona bem no celular), com base na descrição do usuário.
 
@@ -203,12 +209,14 @@ Inclua um botão ou link de WhatsApp usando "https://wa.me/5500000000000" como n
 
 Responda APENAS com o código HTML puro. Sem explicações antes ou depois, sem markdown, sem blocos de código com \`\`\`.`;
 
+    const userContent = currentHtml ? `HTML atual:\n\n${currentHtml}\n\nPedido de ajuste: ${prompt}` : prompt;
+
     const response = await this.client.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 4000,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
+        { role: 'user', content: userContent },
       ],
     });
 
