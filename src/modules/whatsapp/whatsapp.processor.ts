@@ -28,8 +28,7 @@ import {
   SchedulingFlowService,
   SchedulingState,
   SchedulingStepResult,
-  SCHEDULING_TOOL_NAME,
-  SCHEDULING_TOOL_DESCRIPTION,
+  isRequestingScheduling,
 } from '../scheduling/scheduling-flow.service';
 
 const HUMAN_WORDS = [
@@ -457,6 +456,9 @@ export class WhatsappProcessor {
           conversation.id,
           companyId,
         );
+      } else if (isRequestingScheduling(botContent) && (await this.schedulingFlowService.findActiveServices(companyId)).length > 0) {
+        const result = await this.schedulingFlowService.start(companyId);
+        await this.applySchedulingResult(whatsappNumber, fromPhone, conversation.id, companyId, result);
       } else {
         await this.runAiTurn(conversation, contact, whatsappNumber, fromPhone, companyId, savedMessage.id, botContent, isAudioWithTranscription);
       }
@@ -552,22 +554,6 @@ export class WhatsappProcessor {
       },
     });
 
-    // Tools de agendamento só aparecem se a empresa já tiver cadastrado
-    // algum serviço — evita poluir o prompt/lista de tools pra quem não usa.
-    // Campanhas que restringem enabledToolNames e não incluem nenhuma tool
-    // de agendamento ficam de fora — evita misturar "agendar reunião
-    // comercial" (ex: campanha de vendas) com "agendar horário de
-    // atendimento" na mesma conversa.
-    const schedulingAllowed = !enabledToolNames?.length || enabledToolNames.includes(SCHEDULING_TOOL_NAME);
-    const activeServices = await this.schedulingFlowService.findActiveServices(companyId);
-    if (activeServices.length > 0 && schedulingAllowed) {
-      tools.push({
-        name: SCHEDULING_TOOL_NAME,
-        description: SCHEDULING_TOOL_DESCRIPTION,
-        parameters: { type: 'object', properties: {} },
-      });
-    }
-
     const executeTool = async (name: string, args: any) => {
       if (name === 'salvar_variavel') {
         if (!/^[a-z0-9_]+$/.test(args.nome ?? '')) {
@@ -592,12 +578,6 @@ export class WhatsappProcessor {
           return { success: true, result: 'fluxo executado (só continha blocos automáticos) e encerrado imediatamente' };
         }
         return { success: true, result: 'fluxo iniciado' };
-      }
-
-      if (name === SCHEDULING_TOOL_NAME) {
-        const result = await this.schedulingFlowService.start(companyId);
-        await this.applySchedulingResult(whatsappNumber, fromPhone, conversation.id, companyId, result);
-        return { success: true, result: 'lista de agendamento enviada ao cliente — não responda mais sobre isso, a condução agora é automática' };
       }
 
       const action = actions.find((a) => a.name === name);
@@ -630,9 +610,10 @@ export class WhatsappProcessor {
   }
 
   // Único ponto que efetivamente manda mensagem/grava estado pro fluxo de
-  // agendamento — tanto o início (tool iniciar_agendamento) quanto cada
-  // passo seguinte (ver aiState?.startsWith('scheduling:') acima) terminam
-  // aqui. Mantém a lógica de decisão (o que perguntar, o que validar) só no
+  // agendamento — tanto o início (gatilho por palavra-chave, ver
+  // isRequestingScheduling acima) quanto cada passo seguinte (ver
+  // aiState?.startsWith('scheduling:') acima) terminam aqui. Mantém a lógica
+  // de decisão (o que perguntar, o que validar) só no
   // SchedulingFlowService, compartilhada com o simulador de prompt.
   private async applySchedulingResult(
     whatsappNumber: any,

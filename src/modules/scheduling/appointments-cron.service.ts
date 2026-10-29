@@ -30,6 +30,15 @@ export class AppointmentsCronService {
     this.logger.log(`Enviando ${due.length} lembrete(s) de agendamento`);
 
     for (const appointment of due) {
+      // Marca ANTES de tentar enviar (não depois do try/catch) — se marcasse só
+      // depois de sendMessage() completar sem erro, qualquer falha posterior ao
+      // envio de fato (gravar a mensagem, registrar uso, etc.) deixava
+      // reminderSentAt nulo pra sempre, e o agendamento voltava a ser "devido"
+      // no próximo minuto, reenviando o lembrete indefinidamente — já aconteceu
+      // em produção. Pra um lembrete, reenviar é muito pior que eventualmente
+      // perder um por falha pontual, então marca otimista antes de tentar.
+      await this.appointmentRepository.update(appointment.id, { reminderSentAt: new Date() });
+
       try {
         const conversation = await this.conversationRepository.findOne({
           where: { contactId: appointment.contactId },
@@ -55,9 +64,7 @@ export class AppointmentsCronService {
         });
       } catch (e: any) {
         this.logger.error(`Falha ao enviar lembrete do agendamento ${appointment.id}: ${e.message}`);
-        continue;
       }
-      await this.appointmentRepository.update(appointment.id, { reminderSentAt: new Date() });
     }
   }
 }

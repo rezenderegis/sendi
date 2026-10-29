@@ -8,14 +8,28 @@ export type SchedulingState =
   | { step: 'day'; serviceId: string }
   | { step: 'time'; serviceId: string; day: string };
 
-// Nome/descrição centralizados aqui (não duplicados no processor e no
-// simulador) — já causou um bug real: a descrição divergiu entre os dois e
-// a IA passou a inventar informação (tipo "link de agendamento") que não
-// existe em lugar nenhum, só porque a versão de um dos dois lados ficou
-// desatualizada.
-export const SCHEDULING_TOOL_NAME = 'iniciar_agendamento';
-export const SCHEDULING_TOOL_DESCRIPTION =
-  'Assim que o cliente demonstrar interesse em marcar um horário, chame esta ferramenta IMEDIATAMENTE, sem perguntar como ele prefere agendar nem descrever o processo antes — ela já envia uma lista fixa (serviço → dia → horário) pro cliente escolher. Não existe opção de link ou ligação de consultor pra isso: é só essa lista. A partir da chamada, a condução é automática, não é mais você quem conversa sobre isso.';
+// O gatilho que INICIA o agendamento é detectado por palavra-chave, não por
+// tool-call de IA — a IA tinha a liberdade de "explicar" o processo antes de
+// chamar a ferramenta, e acabava inventando opções que não existem (tipo
+// "prefere um link ou que um consultor ligue?"). Palavra-chave bate, chama
+// start() direto, sem a IA no meio — igual isRequestingHuman/isSupportRequest
+// já fazem no whatsapp.processor.ts. Centralizado aqui (não duplicado no
+// processor e no simulador) pra evitar as duas cópias divergirem de novo.
+function normalizeText(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+const SCHEDULING_WORDS = [
+  'agendar', 'agendamento', 'agende', 'agendando',
+  'marcar horario', 'marcar um horario', 'marcar uma consulta', 'marcar consulta', 'quero marcar',
+  'tem horario', 'tem algum horario', 'horario disponivel', 'horarios disponiveis',
+  'horario livre', 'horarios livres',
+];
+
+export function isRequestingScheduling(text: string): boolean {
+  const n = normalizeText(text);
+  return SCHEDULING_WORDS.some((w) => n.includes(w));
+}
 
 export interface SchedulingStepResult {
   bodyText: string;

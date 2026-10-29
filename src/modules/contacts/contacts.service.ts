@@ -41,7 +41,12 @@ function parseRows(buffer: Buffer, mimetype: string, filename?: string): Record<
     const ws = wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws, { defval: '' });
   }
-  return parse(buffer, { columns: true, skip_empty_lines: true, trim: true });
+  // Excel em pt-BR costuma salvar CSV separado por ";" (vírgula já é o separador
+  // decimal) — detecta pelo cabeçalho em vez de travar em "," fixo, senão a
+  // planilha inteira vira uma coluna só e toda linha falha por "telefone ausente".
+  const firstLine = buffer.toString('utf8').split('\n', 1)[0] ?? '';
+  const delimiter = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ';' : ',';
+  return parse(buffer, { columns: true, skip_empty_lines: true, trim: true, delimiter });
 }
 
 export interface ImportResult {

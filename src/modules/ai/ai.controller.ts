@@ -15,8 +15,7 @@ import {
   SchedulingFlowService,
   SchedulingState,
   SchedulingStepResult,
-  SCHEDULING_TOOL_NAME,
-  SCHEDULING_TOOL_DESCRIPTION,
+  isRequestingScheduling,
 } from '../scheduling/scheduling-flow.service';
 
 function renderSchedulingReply(result: SchedulingStepResult): string {
@@ -108,6 +107,15 @@ export class AiController {
       return { reply: renderSchedulingReply(result), toolCalls: [], schedulingState: result.nextState };
     }
 
+    // Igual no WhatsApp real: o gatilho que INICIA o agendamento é por
+    // palavra-chave, não por tool-call de IA — ver isRequestingScheduling em
+    // scheduling-flow.service.ts pro porquê.
+    const lastMessage = dto.history[dto.history.length - 1]?.content ?? '';
+    if (isRequestingScheduling(lastMessage) && (await this.schedulingFlowService.findActiveServices(companyId)).length > 0) {
+      const result = await this.schedulingFlowService.start(companyId);
+      return { reply: renderSchedulingReply(result), toolCalls: [], schedulingState: result.nextState };
+    }
+
     const allActions = await this.externalActionsService.findActive(companyId);
     const actions = dto.enabledToolNames?.length ? allActions.filter((a) => dto.enabledToolNames!.includes(a.name)) : allActions;
     const tools = actions.map((a) => ({ name: a.name, description: a.description, parameters: a.parametersSchema }));
@@ -126,40 +134,16 @@ export class AiController {
       });
     }
 
-    const schedulingAllowed = !dto.enabledToolNames?.length || dto.enabledToolNames.includes(SCHEDULING_TOOL_NAME);
-    const activeServices = await this.schedulingFlowService.findActiveServices(companyId);
-    if (activeServices.length > 0 && schedulingAllowed) {
-      tools.push({
-        name: SCHEDULING_TOOL_NAME,
-        description: SCHEDULING_TOOL_DESCRIPTION,
-        parameters: { type: 'object', properties: {} },
-      });
-    }
-
     // Contato/conversa sintéticos — só existem pra resolver {{placeholders}}; ações que
     // gravariam num contato/conversa real (tag, atualizar contato, transferir, encerrar) são
     // puladas pelo FlowEngineService quando isSimulated é true (ver flow-engine.service.ts).
     const fakeContact = { id: '', companyId, name: contactName, metadata: {} } as any;
     const fakeConversation = { id: '', variables: null } as any;
 
-    // Capturado pela tool iniciar_agendamento (se chamada) e devolvido na
-    // resposta — o front do simulador reenvia esse estado na próxima chamada
-    // pra continuar o fluxo fixo (ver dto.schedulingState acima).
-    let nextSchedulingState: SchedulingState | null = null;
-    // A lista de opções precisa chegar EXATAMENTE como calculada (pro teste
-    // bater com o que o WhatsApp real mandaria) — não dá pra confiar na IA
-    // reescrever isso na resposta final dela, então sobrescreve o reply.
-    let schedulingReplyOverride: string | null = null;
-
     const executeTool = async (name: string, args: any) => {
       let result: any;
       try {
-        if (name === SCHEDULING_TOOL_NAME) {
-          const stepResult = await this.schedulingFlowService.start(companyId);
-          nextSchedulingState = stepResult.nextState;
-          schedulingReplyOverride = renderSchedulingReply(stepResult);
-          result = { success: true, result: schedulingReplyOverride };
-        } else if (name === 'iniciar_fluxo') {
+        if (name === 'iniciar_fluxo') {
           const flow = availableFlows.find((f) => f.name === args.nome);
           if (!flow?.startStepId) {
             result = { success: false, result: 'fluxo não encontrado ou sem passo inicial definido' };
@@ -191,6 +175,6 @@ export class AiController {
     };
 
     const reply = await this.aiService.chat(contactName, dto.history, dto.promptContent, tools.length ? { tools, executeTool } : undefined);
-    return { reply: schedulingReplyOverride ?? reply, toolCalls, schedulingState: nextSchedulingState };
+    return { reply, toolCalls, schedulingState: null };
   }
 }
