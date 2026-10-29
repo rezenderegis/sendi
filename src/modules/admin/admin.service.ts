@@ -6,6 +6,8 @@ import { WhatsappNumber } from '../whatsapp/whatsapp-number.entity';
 import { UsageService } from '../billing/usage.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { LandingPagesService } from '../landing-pages/landing-pages.service';
+import { SitesService } from '../sites/sites.service';
+import { UpdateSiteAdminDto } from '../sites/dto/site.dto';
 import { CreditBalanceDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
 
 @Injectable()
@@ -18,6 +20,7 @@ export class AdminService {
     private readonly usageService: UsageService,
     private readonly whatsappService: WhatsappService,
     private readonly landingPagesService: LandingPagesService,
+    private readonly sitesService: SitesService,
   ) {}
 
   async listCompanies() {
@@ -31,10 +34,18 @@ export class AdminService {
           email: company.email,
           plan: company.plan,
           isActive: company.isActive,
+          enabledModules: company.enabledModules,
           ...summary,
         };
       }),
     );
+  }
+
+  async setCompanyModules(companyId: string, enabledModules: string[]) {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Empresa não encontrada');
+    await this.companyRepo.update({ id: companyId }, { enabledModules });
+    return { id: companyId, enabledModules };
   }
 
   getSettings() {
@@ -71,6 +82,16 @@ export class AdminService {
 
   setLandingPageActive(slug: string, isActive: boolean) {
     return this.landingPagesService.setActive(slug, isActive);
+  }
+
+  async listSites() {
+    const [sites, companies] = await Promise.all([this.sitesService.findAll(), this.companyRepo.find()]);
+    const companyNameById = new Map(companies.map((c) => [c.id, c.name]));
+    return sites.map((site) => ({ ...site, companyName: companyNameById.get(site.companyId) ?? '—' }));
+  }
+
+  updateSiteAdmin(id: string, dto: UpdateSiteAdminDto) {
+    return this.sitesService.updateAdmin(id, dto);
   }
 
   async getReconciliation(numberId: string, since: Date, until: Date) {

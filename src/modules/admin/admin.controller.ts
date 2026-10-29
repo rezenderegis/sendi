@@ -4,7 +4,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
-import { CreditBalanceDto, SetLandingPageActiveDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
+import { CreditBalanceDto, SetCompanyModulesDto, SetLandingPageActiveDto, SetNumberLimitsDto, UpdatePlatformSettingsDto } from './dto/admin.dto';
+import { UpdateSiteAdminDto } from '../sites/dto/site.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -16,6 +17,11 @@ export class AdminController {
   @Get('companies')
   listCompanies() {
     return this.adminService.listCompanies();
+  }
+
+  @Patch('companies/:id/modules')
+  setCompanyModules(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetCompanyModulesDto) {
+    return this.adminService.setCompanyModules(id, dto.enabledModules);
   }
 
   @Get('settings')
@@ -55,6 +61,16 @@ export class AdminController {
   @Patch('landing-pages/:slug')
   setLandingPageActive(@Param('slug') slug: string, @Body() dto: SetLandingPageActiveDto) {
     return this.adminService.setLandingPageActive(slug, dto.isActive);
+  }
+
+  @Get('sites')
+  listSites() {
+    return this.adminService.listSites();
+  }
+
+  @Patch('sites/:id')
+  updateSiteAdmin(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateSiteAdminDto) {
+    return this.adminService.updateSiteAdmin(id, dto);
   }
 
   @Get('whatsapp-numbers/:id/reconciliation')

@@ -35,6 +35,13 @@ export class Company {
   @Column({ type: 'int', default: 0 })
   balanceCents: number;
 
+  // Quais produtos essa empresa tem acesso — controla o que aparece no menu
+  // do dashboard (ex: 'crm' = conversas/WhatsApp/vendas, 'pages' =
+  // GlobalSixPages). Lista simples (não tabela própria) porque só o admin
+  // da plataforma mexe nisso, não precisa de metadata por módulo.
+  @Column({ type: 'jsonb', default: () => `'["crm"]'` })
+  enabledModules: string[];
+
   @OneToMany(() => User, (user) => user.company)
   users: User[];
 
