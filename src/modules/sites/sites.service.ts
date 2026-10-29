@@ -25,11 +25,15 @@ export class SitesService {
     return site;
   }
 
-  async create(companyId: string, dto: CreateSiteDto): Promise<Site> {
+  async assertPagesModuleEnabled(companyId: string): Promise<void> {
     const company = await this.companyRepository.findOne({ where: { id: companyId } });
     if (!company?.enabledModules?.includes('pages')) {
       throw new ForbiddenException('Sua empresa não tem o módulo de páginas habilitado');
     }
+  }
+
+  async create(companyId: string, dto: CreateSiteDto): Promise<Site> {
+    await this.assertPagesModuleEnabled(companyId);
 
     const existing = await this.repository.findOne({ where: { slug: dto.slug } });
     if (existing) throw new ConflictException('Já existe um site com esse slug');

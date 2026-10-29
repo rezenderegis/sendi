@@ -14,6 +14,13 @@ export class CreateSiteDto {
   content: string;
 }
 
+export class GenerateSiteHtmlDto {
+  @IsString()
+  @MinLength(5)
+  @MaxLength(2000)
+  prompt: string;
+}
+
 export class UpdateSiteDto {
   @IsOptional()
   @IsString()

@@ -189,4 +189,30 @@ export class AiService {
     this.logger.warn('Limite de rounds de tool-calls atingido sem resposta final');
     return 'Desculpe, não consegui processar sua mensagem. Tente novamente.';
   }
+
+  // Gera uma landing page completa em HTML a partir de uma descrição livre —
+  // usado pelo GlobalSixPages (módulo sites). Chamada separada de chat()
+  // porque precisa de um max_tokens bem maior (uma página HTML com CSS
+  // inline facilmente passa de 200 tokens) e não tem relação com conversa.
+  async generateSiteHtml(prompt: string): Promise<string> {
+    const systemPrompt = `Você é um gerador de landing pages em HTML puro.
+
+Gere um documento HTML completo e autocontido: <!doctype html>, <html>, <head> com <style> inline (sem dependências externas), <body> — moderno, bonito, responsivo (funciona bem no celular), com base na descrição do usuário.
+
+Inclua um botão ou link de WhatsApp usando "https://wa.me/5500000000000" como número placeholder (o usuário vai trocar depois).
+
+Responda APENAS com o código HTML puro. Sem explicações antes ou depois, sem markdown, sem blocos de código com \`\`\`.`;
+
+    const response = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 4000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content ?? '';
+    return raw.trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  }
 }
